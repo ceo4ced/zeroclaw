@@ -352,13 +352,34 @@
   </tr>
 </table>
 
+<h3>Additional Seats</h3>
+<table>
+  <tr><th>Tier</th><th>Seats Included</th><th>Additional Seat Rate</th><th>Notes</th></tr>
+  <tr><td>Free</td><td>1</td><td>&mdash;</td><td>Single-user only</td></tr>
+  <tr><td>Builder</td><td>1</td><td>$12/seat/month</td><td>Add up to 4 additional seats</td></tr>
+  <tr><td>Team</td><td>5</td><td>$15/seat/month</td><td>Add up to 20 additional seats</td></tr>
+  <tr><td>Enterprise</td><td>10</td><td>$25/seat/month</td><td>Unlimited additional seats; volume discounts at 25+</td></tr>
+</table>
+<p><em>Per-seat pricing covers full platform access for that user: dashboard, agent management, API keys, and audit trail. Each seat gets its own identity and permissions.</em></p>
+
 <h3>Usage-Based Overages</h3>
 <table>
-  <tr><th>Resource</th><th>Included in Tier</th><th>Overage Rate</th></tr>
-  <tr><td>Agent-hours</td><td>Per tier (see above)</td><td>$0.05/agent-hour</td></tr>
-  <tr><td>Storage</td><td>Per tier (see above)</td><td>$0.50/GB/month</td></tr>
-  <tr><td>Tool executions</td><td>Unlimited (fair use on Free)</td><td>$0.001/execution above fair-use cap</td></tr>
+  <tr><th>Resource</th><th>Included in Tier</th><th>Overage Rate</th><th>Billing</th></tr>
+  <tr><td>Agent-hours</td><td>Per tier (see above)</td><td>$0.05/agent-hour</td><td>Metered daily, billed monthly</td></tr>
+  <tr><td>Storage</td><td>Per tier (see above)</td><td>$0.50/GB/month</td><td>Peak usage, billed monthly</td></tr>
+  <tr><td>Tool executions</td><td>Unlimited (fair use on Free)</td><td>$0.001/execution above fair-use cap</td><td>Metered, billed monthly</td></tr>
 </table>
+
+<h3>Per-Hour Rate Card (On-Demand Agent Compute)</h3>
+<p>For users who need burst capacity beyond their tier's included agent-hours, or want to run agents on-demand without a subscription commitment:</p>
+<table>
+  <tr><th>Compute Type</th><th>Rate</th><th>Description</th></tr>
+  <tr><td>Standard agent-hour</td><td>$0.05/hr</td><td>Single agent running with standard memory and tool access</td></tr>
+  <tr><td>High-memory agent-hour</td><td>$0.10/hr</td><td>Agent with &gt;1 GB active memory context</td></tr>
+  <tr><td>Multi-agent coordination hour</td><td>$0.15/hr</td><td>Per-agent rate when 3+ agents run coordinated workflows</td></tr>
+  <tr><td>Dedicated compute hour</td><td>$0.25/hr</td><td>Enterprise only &mdash; isolated compute, guaranteed resources</td></tr>
+</table>
+<p><em>On-demand rates apply to overage beyond tier limits. Tier-included hours are always cheaper than on-demand. This incentivizes subscription commitment while allowing flexible burst usage.</em></p>
 
 <h3>Managed LLM Proxy Pricing (Optional)</h3>
 <p>Users who opt in to the managed proxy pay a transparent markup over base model costs. This provides unified billing, built-in cost controls, and rate limiting.</p>
