@@ -174,6 +174,46 @@
 
 <div class="container">
 
+  <!-- ───── SpacetimeDB Concepts Primer ───── -->
+  <div class="section-label">Before you dive in</div>
+  <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">SpacetimeDB Concepts Primer</h2>
+  <p style="color: var(--text-muted); margin-bottom: 1.5rem;">ZeroClaw's SpacetimeDB runtime uses several concepts that may be unfamiliar. Here's a quick glossary so the rest of these docs make sense.</p>
+
+  <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; margin-bottom: 2rem;">
+    <table style="width: 100%; border-collapse: collapse; background: none; border: none;">
+      <tr>
+        <th style="background: rgba(88,166,255,0.06); color: var(--accent); font-weight: 600; padding: 0.7rem 1rem; text-align: left; font-size: 0.9rem; border-bottom: 1px solid var(--border);">Concept</th>
+        <th style="background: rgba(88,166,255,0.06); color: var(--accent); font-weight: 600; padding: 0.7rem 1rem; text-align: left; font-size: 0.9rem; border-bottom: 1px solid var(--border);">What It Means</th>
+      </tr>
+      <tr>
+        <td style="padding: 0.7rem 1rem; font-weight: 600; font-size: 0.9rem; border-bottom: 1px solid var(--border);">Table</td>
+        <td style="padding: 0.7rem 1rem; font-size: 0.9rem; color: var(--text-muted); border-bottom: 1px solid var(--border);">A typed database table, like a SQL table. All agent state (agents, messages, memories, tool requests) lives in tables. Tables are defined as Rust structs with the <code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">#[spacetimedb::table]</code> macro.</td>
+      </tr>
+      <tr>
+        <td style="padding: 0.7rem 1rem; font-weight: 600; font-size: 0.9rem; border-bottom: 1px solid var(--border);">Reducer</td>
+        <td style="padding: 0.7rem 1rem; font-size: 0.9rem; color: var(--text-muted); border-bottom: 1px solid var(--border);">A function that mutates table state transactionally. Think of it like a stored procedure that can only read/write tables &mdash; it <strong>cannot</strong> make outbound HTTP calls. Used for state management (create agent, store memory, update policy).</td>
+      </tr>
+      <tr>
+        <td style="padding: 0.7rem 1rem; font-weight: 600; font-size: 0.9rem; border-bottom: 1px solid var(--border);">Procedure</td>
+        <td style="padding: 0.7rem 1rem; font-size: 0.9rem; color: var(--text-muted); border-bottom: 1px solid var(--border);">Like a reducer, but with access to <code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">ctx.http</code> for outbound HTTP. This is why the orchestration loop (which calls the LLM API) runs as a procedure, not a reducer. Requires the SpacetimeDB <code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">"unstable"</code> feature.</td>
+      </tr>
+      <tr>
+        <td style="padding: 0.7rem 1rem; font-weight: 600; font-size: 0.9rem; border-bottom: 1px solid var(--border);">Subscription</td>
+        <td style="padding: 0.7rem 1rem; font-size: 0.9rem; color: var(--text-muted); border-bottom: 1px solid var(--border);">A real-time WebSocket push mechanism. Clients subscribe to a table (or filtered rows) and receive instant updates when rows change. The worker uses subscriptions to watch for new tool requests and pending sends.</td>
+      </tr>
+      <tr>
+        <td style="padding: 0.7rem 1rem; font-weight: 600; font-size: 0.9rem; border-bottom: 1px solid var(--border);">Identity</td>
+        <td style="padding: 0.7rem 1rem; font-size: 0.9rem; color: var(--text-muted); border-bottom: 1px solid var(--border);">A cryptographic identity assigned to each connected client. Used for ownership tracking (who owns an agent) and worker registration. Available as <code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">ctx.sender</code> in reducers/procedures.</td>
+      </tr>
+      <tr>
+        <td style="padding: 0.7rem 1rem; font-weight: 600; font-size: 0.9rem; border-bottom: none;">ctx.http</td>
+        <td style="padding: 0.7rem 1rem; font-size: 0.9rem; color: var(--text-muted); border-bottom: none;">The HTTP client available only inside procedures. Supports GET/POST with headers and body. This is how the server calls LLM APIs, sends Telegram messages, and executes HTTP-based tools &mdash; all from inside the database.</td>
+      </tr>
+    </table>
+  </div>
+
+  <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 2rem;">For comprehensive SpacetimeDB documentation, see <a href="https://spacetimedb.com/docs" style="color: var(--accent); text-decoration: none;">spacetimedb.com/docs</a>.</p>
+
   <!-- ───── What We Built ───── -->
   <div class="section-label">What we built</div>
   <div class="concept-grid">
