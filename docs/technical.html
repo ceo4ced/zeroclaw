@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZeroClaw SpacetimeDB Runtime — Technical Architecture</title>
+<title>SpaceClaw SpacetimeDB Runtime — Technical Architecture</title>
 <style>
   :root {
     --bg: #0d1117; --surface: #161b22; --border: #30363d;
@@ -127,7 +127,7 @@
 <body>
 
 <nav class="top-nav">
-  <span class="logo">ZeroClaw</span>
+  <span class="logo">SpaceClaw</span>
   <a href="index.html">Overview</a>
   <a href="technical.html" class="active">Technical</a>
   <a href="implementation.html">Implementation</a>
@@ -303,7 +303,7 @@
 <pre><code>{
   <span class="c-str">"model"</span>: <span class="c-str">"anthropic/claude-sonnet-4-20250514"</span>,
   <span class="c-str">"messages"</span>: [
-    { <span class="c-str">"role"</span>: <span class="c-str">"system"</span>, <span class="c-str">"content"</span>: <span class="c-str">"You are ZeroClaw, an autonomous agent..."</span> },
+    { <span class="c-str">"role"</span>: <span class="c-str">"system"</span>, <span class="c-str">"content"</span>: <span class="c-str">"You are SpaceClaw, an autonomous agent..."</span> },
     { <span class="c-str">"role"</span>: <span class="c-str">"user"</span>,   <span class="c-str">"content"</span>: <span class="c-str">"What is the population of Tokyo?"</span> }
   ],
   <span class="c-str">"tools"</span>: [
@@ -349,7 +349,7 @@
 <pre><code>{
   <span class="c-str">"model"</span>: <span class="c-str">"anthropic/claude-sonnet-4-20250514"</span>,
   <span class="c-str">"messages"</span>: [
-    { <span class="c-str">"role"</span>: <span class="c-str">"system"</span>,    <span class="c-str">"content"</span>: <span class="c-str">"You are ZeroClaw..."</span> },
+    { <span class="c-str">"role"</span>: <span class="c-str">"system"</span>,    <span class="c-str">"content"</span>: <span class="c-str">"You are SpaceClaw..."</span> },
     { <span class="c-str">"role"</span>: <span class="c-str">"user"</span>,      <span class="c-str">"content"</span>: <span class="c-str">"What is the population of Tokyo?"</span> },
     { <span class="c-str">"role"</span>: <span class="c-str">"assistant"</span>, <span class="c-str">"content"</span>: <span class="c-str">""</span>,
       <span class="c-str">"tool_calls"</span>: [{ <span class="c-str">"id"</span>: <span class="c-str">"call_abc123"</span>, ... }] },
@@ -826,7 +826,7 @@ ZEROCLAW_AGENT_ID=1 \
 <!-- ─── Observability ─── -->
 <h2>Observability &amp; Monitoring</h2>
 
-<p>Every state change in ZeroClaw is a table mutation, which means you can monitor the entire system by subscribing to tables. Here is how to observe what the agent is doing.</p>
+<p>Every state change in SpaceClaw is a table mutation, which means you can monitor the entire system by subscribing to tables. Here is how to observe what the agent is doing.</p>
 
 <h3>Key Tables to Watch</h3>
 <table>
@@ -893,13 +893,13 @@ conn.<span class="c-fn">on_update</span>::&lt;<span class="c-type">LocalToolRequ
   <strong>External monitoring integration:</strong> Set up a dedicated agent with a <code>webhook</code> channel config pointing to your monitoring system (PagerDuty, Slack alerts, etc.). Write a simple subscription client that watches for error conditions and calls <code>process_message()</code> to alert the monitoring agent.
 </div>
 
-<!-- ─── Relationship to Main ZeroClaw ─── -->
-<h2>Relationship to Main ZeroClaw</h2>
+<!-- ─── Relationship to Main SpaceClaw ─── -->
+<h2>Relationship to Main SpaceClaw</h2>
 
-<p>The SpacetimeDB runtime reimplements ZeroClaw's core agent loop using a database-centric architecture. Here's how the concepts map:</p>
+<p>The SpacetimeDB runtime reimplements SpaceClaw's core agent loop using a database-centric architecture. Here's how the concepts map:</p>
 
 <table>
-  <tr><th>Main ZeroClaw (src/)</th><th>SpacetimeDB Runtime (spacetime/)</th></tr>
+  <tr><th>Main SpaceClaw (src/)</th><th>SpacetimeDB Runtime (spacetime/)</th></tr>
   <tr><td><code>Provider</code> trait + 19 implementations</td><td>LLM calls via <code>ctx.http</code> in procedures</td></tr>
   <tr><td><code>Channel</code> trait + 20 implementations</td><td><code>channel_configs</code> table + HTTP sends in procedures</td></tr>
   <tr><td><code>Tool</code> trait + 31 implementations</td><td><code>tool_registry</code> table + http/local execution split</td></tr>
@@ -918,7 +918,7 @@ conn.<span class="c-fn">on_update</span>::&lt;<span class="c-type">LocalToolRequ
 
 </div>
 
-<footer>ZeroClaw &mdash; SpacetimeDB Agent Runtime Documentation</footer>
+<footer>SpaceClaw &mdash; SpacetimeDB Agent Runtime Documentation</footer>
 
 </body>
 </html>

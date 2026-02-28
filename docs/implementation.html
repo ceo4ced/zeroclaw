@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZeroClaw SpacetimeDB Runtime — Implementation</title>
+<title>SpaceClaw SpacetimeDB Runtime — Implementation</title>
 <style>
   :root {
     --bg: #0d1117; --surface: #161b22; --border: #30363d;
@@ -130,7 +130,7 @@
 <body>
 
 <nav class="top-nav">
-  <span class="logo">ZeroClaw</span>
+  <span class="logo">SpaceClaw</span>
   <a href="index.html">Overview</a>
   <a href="technical.html">Technical</a>
   <a href="implementation.html" class="active">Implementation</a>
@@ -384,11 +384,11 @@ spacetime/
     <span class="cm">// Seed default agent</span>
     ctx.db.<span class="fn">agents</span>().<span class="fn">insert</span>(<span class="ty">Agent</span> {
         id: <span class="nu">0</span>,  <span class="cm">// auto_inc will assign 1</span>
-        name: <span class="st">"ZeroClaw"</span>.into(),
+        name: <span class="st">"SpaceClaw"</span>.into(),
         model: <span class="st">"anthropic/claude-sonnet-4-20250514"</span>.into(),
         api_base_url: <span class="st">"https://api.anthropic.com/v1/messages"</span>.into(),
         api_key: <span class="ty">String</span>::new(),  <span class="cm">// must be set via update_agent</span>
-        system_prompt: <span class="st">"You are ZeroClaw, an autonomous agent. ..."</span>.into(),
+        system_prompt: <span class="st">"You are SpaceClaw, an autonomous agent. ..."</span>.into(),
         max_tool_iterations: <span class="nu">10</span>,
         max_history_messages: <span class="nu">50</span>,
         owner: ctx.sender,
@@ -964,7 +964,7 @@ spacetime/
 }</code></pre>
 
 <div class="annotation">
-  <strong>Deny-by-default in practice:</strong> When the <code>allowed_tools_json</code> list is non-empty, only listed tools are permitted. The blocked list always wins &mdash; even if a tool appears on both lists, it's denied. This mirrors ZeroClaw's main codebase security philosophy.
+  <strong>Deny-by-default in practice:</strong> When the <code>allowed_tools_json</code> list is non-empty, only listed tools are permitted. The blocked list always wins &mdash; even if a tool appears on both lists, it's denied. This mirrors SpaceClaw's main codebase security philosophy.
 </div>
 
 <h3>Security Policy Configuration Examples</h3>
@@ -1301,7 +1301,7 @@ spacetime/
 
 </div>
 
-<footer>ZeroClaw &mdash; SpacetimeDB Agent Runtime Documentation</footer>
+<footer>SpaceClaw &mdash; SpacetimeDB Agent Runtime Documentation</footer>
 
 </body>
 </html>
