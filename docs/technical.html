@@ -131,6 +131,7 @@
   <a href="index.html">Overview</a>
   <a href="technical.html" class="active">Technical</a>
   <a href="implementation.html">Implementation</a>
+  <a href="business-plan.html">Business Plan</a>
 </nav>
 
 <div class="container">
@@ -280,6 +281,104 @@
                  └─ <span class="c-kw">return</span> ProcessResult { status: <span class="c-str">"awaiting_local_tools"</span> }
 </pre></div>
 
+<!-- ─── End-to-End Example ─── -->
+<h2>End-to-End Example: A Real Conversation</h2>
+
+<p>To make the orchestration loop concrete, here is the exact sequence of events when a user asks the agent to search the web. This shows every JSON payload and table mutation along the way.</p>
+
+<h3>Scenario: "What is the population of Tokyo?"</h3>
+
+<p><strong>Step 1:</strong> The user sends a message. The caller invokes the <code>process_message</code> procedure.</p>
+
+<pre><code><span class="c-cmt">// Procedure call from worker or external client</span>
+<span class="c-fn">process_message</span>(
+    agent_id: <span class="c-type">1</span>,
+    channel:  <span class="c-str">"cli"</span>,
+    sender:   <span class="c-str">"zeroclaw_user"</span>,
+    content:  <span class="c-str">"What is the population of Tokyo?"</span>
+)</code></pre>
+
+<p><strong>Step 2:</strong> The procedure stores the message, auto-saves to memory, and builds the LLM request. Here is the JSON body sent to the LLM API via <code>ctx.http</code>:</p>
+
+<pre><code>{
+  <span class="c-str">"model"</span>: <span class="c-str">"anthropic/claude-sonnet-4-20250514"</span>,
+  <span class="c-str">"messages"</span>: [
+    { <span class="c-str">"role"</span>: <span class="c-str">"system"</span>, <span class="c-str">"content"</span>: <span class="c-str">"You are ZeroClaw, an autonomous agent..."</span> },
+    { <span class="c-str">"role"</span>: <span class="c-str">"user"</span>,   <span class="c-str">"content"</span>: <span class="c-str">"What is the population of Tokyo?"</span> }
+  ],
+  <span class="c-str">"tools"</span>: [
+    {
+      <span class="c-str">"type"</span>: <span class="c-str">"function"</span>,
+      <span class="c-str">"function"</span>: {
+        <span class="c-str">"name"</span>: <span class="c-str">"web_search"</span>,
+        <span class="c-str">"description"</span>: <span class="c-str">"Search the web via DuckDuckGo"</span>,
+        <span class="c-str">"parameters"</span>: { <span class="c-str">"type"</span>: <span class="c-str">"object"</span>, <span class="c-str">"properties"</span>: { <span class="c-str">"query"</span>: { <span class="c-str">"type"</span>: <span class="c-str">"string"</span> } } }
+      }
+    },
+    <span class="c-cmt">// ... other tool definitions</span>
+  ],
+  <span class="c-str">"max_tokens"</span>: <span class="c-type">4096</span>
+}</code></pre>
+
+<p><strong>Step 3:</strong> The LLM responds with a tool call (it wants to search the web):</p>
+
+<pre><code>{
+  <span class="c-str">"content"</span>: <span class="c-str">""</span>,
+  <span class="c-str">"tool_calls"</span>: [
+    {
+      <span class="c-str">"id"</span>: <span class="c-str">"call_abc123"</span>,
+      <span class="c-str">"type"</span>: <span class="c-str">"function"</span>,
+      <span class="c-str">"function"</span>: {
+        <span class="c-str">"name"</span>: <span class="c-str">"web_search"</span>,
+        <span class="c-str">"arguments"</span>: <span class="c-str">"{\"query\": \"population of Tokyo 2025\"}"</span>
+      }
+    }
+  ]
+}</code></pre>
+
+<p><strong>Step 4:</strong> <code>web_search</code> is an HTTP tool. The procedure executes it inline via <code>ctx.http</code> (no worker involved):</p>
+
+<pre><code><span class="c-cmt">// execute_http_tool makes this call inside SpacetimeDB:</span>
+<span class="c-accent">GET</span> https://html.duckduckgo.com/html/?q=population%20of%20Tokyo%202025
+
+<span class="c-cmt">// Response (truncated to 2000 chars):</span>
+<span class="c-str">"Tokyo population 2025 - The population of Tokyo is approximately 13.96 million..."</span></code></pre>
+
+<p><strong>Step 5:</strong> The tool result is stored as a <code>role=tool</code> message, and the loop calls the LLM again with the tool result included:</p>
+
+<pre><code>{
+  <span class="c-str">"model"</span>: <span class="c-str">"anthropic/claude-sonnet-4-20250514"</span>,
+  <span class="c-str">"messages"</span>: [
+    { <span class="c-str">"role"</span>: <span class="c-str">"system"</span>,    <span class="c-str">"content"</span>: <span class="c-str">"You are ZeroClaw..."</span> },
+    { <span class="c-str">"role"</span>: <span class="c-str">"user"</span>,      <span class="c-str">"content"</span>: <span class="c-str">"What is the population of Tokyo?"</span> },
+    { <span class="c-str">"role"</span>: <span class="c-str">"assistant"</span>, <span class="c-str">"content"</span>: <span class="c-str">""</span>,
+      <span class="c-str">"tool_calls"</span>: [{ <span class="c-str">"id"</span>: <span class="c-str">"call_abc123"</span>, ... }] },
+    { <span class="c-str">"role"</span>: <span class="c-str">"tool"</span>,      <span class="c-str">"content"</span>: <span class="c-str">"Tokyo population 2025 - ..."</span>,
+      <span class="c-str">"tool_call_id"</span>: <span class="c-str">"call_abc123"</span> }
+  ],
+  <span class="c-str">"max_tokens"</span>: <span class="c-type">4096</span>
+}</code></pre>
+
+<p><strong>Step 6:</strong> The LLM returns a final response with no tool calls. The procedure sends it to the channel and returns:</p>
+
+<pre><code><span class="c-cmt">// LLM final response:</span>
+{
+  <span class="c-str">"content"</span>: <span class="c-str">"The population of Tokyo is approximately 13.96 million people as of 2025, making it one of the most populous cities in the world."</span>,
+  <span class="c-str">"tool_calls"</span>: []
+}
+
+<span class="c-cmt">// ProcessResult returned to the caller:</span>
+{
+  <span class="c-str">"status"</span>: <span class="c-str">"completed"</span>,
+  <span class="c-str">"response"</span>: <span class="c-str">"The population of Tokyo is approximately 13.96 million..."</span>,
+  <span class="c-str">"conversation_id"</span>: <span class="c-type">1</span>,
+  <span class="c-str">"pending_local_tools_json"</span>: <span class="c-str">""</span>
+}</code></pre>
+
+<div class="callout success">
+  <strong>Two LLM calls, zero worker involvement.</strong> Because <code>web_search</code> is an HTTP tool, the entire conversation completed inside a single SpacetimeDB procedure invocation. The procedure made two LLM API calls (one to get the tool request, one to get the final answer) and one DuckDuckGo search, all via <code>ctx.http</code>.
+</div>
+
 <!-- ─── HTTP Tools ─── -->
 <h2>Built-in HTTP Tools</h2>
 
@@ -328,6 +427,63 @@
   </tr>
 </table>
 
+<!-- ─── Worker Reconnection ─── -->
+<h2>Worker Reconnection &amp; Resilience</h2>
+
+<p>In production, network disruptions happen. Here is how the worker and SpacetimeDB handle connection loss and recovery.</p>
+
+<h3>Worker Lifecycle</h3>
+<div class="arch-diagram"><pre>
+<span class="c-fn">Worker Start</span>
+  │
+  ├─ <span class="c-accent">Connect</span> to SpacetimeDB via WebSocket
+  │    └─ SpacetimeDB assigns cryptographic <span class="c-type">Identity</span>
+  │
+  ├─ <span class="c-fn">register_worker</span>() reducer → inserts row in <span class="c-type">workers</span> table
+  │
+  ├─ <span class="c-fn">register_local_tool</span>() × 3 → registers shell, file_read, file_write
+  │
+  ├─ <span class="c-accent">Subscribe</span> to <span class="c-type">local_tool_requests</span> (status = 'pending')
+  ├─ <span class="c-accent">Subscribe</span> to <span class="c-type">pending_sends</span> (status = 'pending')
+  │
+  └─ <span class="c-green">Ready</span> — processing tool requests as they arrive
+       │
+       │ <span class="c-cmt">(network disruption)</span>
+       ▼
+  <span class="c-orange">Disconnected</span>
+       │
+       ├─ SpacetimeDB fires <span class="c-fn">on_disconnect</span>()
+       │    └─ Removes worker row from <span class="c-type">workers</span> table
+       │
+       └─ Worker detects disconnect
+            └─ <span class="c-accent">Reconnect</span> with exponential backoff
+                 └─ On success: re-register worker + tools + re-subscribe
+</pre></div>
+
+<h3>What Happens to In-Flight Requests</h3>
+<table>
+  <tr><th>Scenario</th><th>Request State</th><th>Recovery</th></tr>
+  <tr>
+    <td>Worker disconnects before claiming a request</td>
+    <td>Stays <code>pending</code></td>
+    <td>Another worker (or the same worker after reconnect) picks it up</td>
+  </tr>
+  <tr>
+    <td>Worker disconnects while executing (status = <code>processing</code>)</td>
+    <td>Stuck as <code>processing</code></td>
+    <td>The hourly <code>run_hygiene()</code> scheduled task resets stale <code>processing</code> requests back to <code>pending</code></td>
+  </tr>
+  <tr>
+    <td>Worker submits result then disconnects</td>
+    <td><code>completed</code></td>
+    <td>No issue &mdash; <code>continue_conversation()</code> has already been triggered</td>
+  </tr>
+</table>
+
+<div class="callout warn">
+  <strong>Stale request recovery is not instant.</strong> Requests stuck in <code>processing</code> state rely on the hourly hygiene cycle to be reset. In time-sensitive deployments, consider reducing the hygiene interval or implementing a manual <code>reset_stale_requests()</code> reducer.
+</div>
+
 <!-- ─── Security Model ─── -->
 <h2>Security Model</h2>
 
@@ -363,6 +519,121 @@
   <li>Tool authorization is checked per-call, per-agent</li>
 </ul>
 
+<!-- ─── Security Policy Examples ─── -->
+<h3>Security Policy Configuration Examples</h3>
+
+<p>The <code>set_security_policy</code> reducer lets you configure per-agent security postures at runtime. Here are common patterns:</p>
+
+<pre><code><span class="c-cmt">// Example 1: Read-only agent — can search and read, but cannot execute or write</span>
+<span class="c-fn">set_security_policy</span>(
+    agent_id: <span class="c-type">1</span>,
+    autonomy_level:       <span class="c-str">"semi_auto"</span>,
+    allowed_tools_json:   <span class="c-str">"[]"</span>,                              <span class="c-cmt">// allow all by default</span>
+    blocked_tools_json:   <span class="c-str">"[\"shell\", \"file_write\"]"</span>,      <span class="c-cmt">// block dangerous tools</span>
+    max_tool_iterations:  <span class="c-type">5</span>,
+    rate_limit_per_minute: <span class="c-type">20</span>,
+)
+
+<span class="c-cmt">// Example 2: Restricted research agent — only web search and memory</span>
+<span class="c-fn">set_security_policy</span>(
+    agent_id: <span class="c-type">2</span>,
+    autonomy_level:       <span class="c-str">"auto"</span>,
+    allowed_tools_json:   <span class="c-str">"[\"web_search\", \"memory_store\", \"memory_recall\"]"</span>,
+    blocked_tools_json:   <span class="c-str">"[]"</span>,
+    max_tool_iterations:  <span class="c-type">8</span>,
+    rate_limit_per_minute: <span class="c-type">30</span>,
+)
+
+<span class="c-cmt">// Example 3: Public-facing agent — strict rate limit, no local tools</span>
+<span class="c-fn">set_security_policy</span>(
+    agent_id: <span class="c-type">3</span>,
+    autonomy_level:       <span class="c-str">"manual"</span>,
+    allowed_tools_json:   <span class="c-str">"[\"web_search\", \"http_request\"]"</span>,
+    blocked_tools_json:   <span class="c-str">"[\"shell\", \"file_read\", \"file_write\"]"</span>,
+    max_tool_iterations:  <span class="c-type">3</span>,
+    rate_limit_per_minute: <span class="c-type">5</span>,
+)</code></pre>
+
+<h3>Autonomy Levels Explained</h3>
+<table>
+  <tr><th>Level</th><th>Behavior</th><th>Use Case</th></tr>
+  <tr>
+    <td><code>manual</code></td>
+    <td>Tool calls are logged but execution requires explicit confirmation via the approval mechanism. The orchestration pauses until a human (or supervisor agent) approves each tool call.</td>
+    <td>High-risk environments, public-facing bots, compliance-sensitive tasks</td>
+  </tr>
+  <tr>
+    <td><code>semi_auto</code></td>
+    <td>HTTP tools (web_search, memory) execute automatically. Local tools (shell, file_write) require confirmation. This is the default.</td>
+    <td>Development, internal use, balanced risk/autonomy</td>
+  </tr>
+  <tr>
+    <td><code>auto</code></td>
+    <td>All allowed tools execute without confirmation. The agent operates fully autonomously within its allowed/blocked tool boundaries.</td>
+    <td>Trusted internal agents, automated pipelines, batch processing</td>
+  </tr>
+</table>
+
+<!-- ─── Error Handling ─── -->
+<h2>Error Handling &amp; Debugging</h2>
+
+<p>When things go wrong, here is how to diagnose common problems.</p>
+
+<h3>Common Error Scenarios</h3>
+<table>
+  <tr><th>Symptom</th><th>Likely Cause</th><th>How to Fix</th></tr>
+  <tr>
+    <td>ProcessResult returns <code>status: "error"</code> with "Agent not found"</td>
+    <td>Invalid <code>agent_id</code> passed to <code>process_message()</code></td>
+    <td>Query agents table: <code>spacetime sql zeroclaw "SELECT id, name FROM agents"</code></td>
+  </tr>
+  <tr>
+    <td>LLM returns empty or garbled response</td>
+    <td>API key not set or invalid</td>
+    <td>Call <code>update_agent</code> reducer to set a valid API key. Check SpacetimeDB logs for HTTP 401/403 errors.</td>
+  </tr>
+  <tr>
+    <td>Local tool requests stay <code>pending</code> forever</td>
+    <td>No worker is connected or worker crashed</td>
+    <td>Check workers table: <code>spacetime sql zeroclaw "SELECT * FROM workers"</code>. Restart the worker if empty.</td>
+  </tr>
+  <tr>
+    <td>Tool call rejected with "blocked by security policy"</td>
+    <td>Tool is in the agent's <code>blocked_tools_json</code> or not in <code>allowed_tools_json</code></td>
+    <td>Query <code>security_policies</code> for the agent and adjust allowed/blocked lists.</td>
+  </tr>
+  <tr>
+    <td>ProcessResult returns <code>status: "iteration_limit"</code></td>
+    <td>Agent exceeded <code>max_tool_iterations</code> without producing a final answer</td>
+    <td>Increase <code>max_tool_iterations</code> on the agent, or simplify the task.</td>
+  </tr>
+  <tr>
+    <td>Channel message not delivered</td>
+    <td>Channel config missing or incorrect credentials</td>
+    <td>Check <code>channel_configs</code> table and <code>pending_sends</code> for failed rows.</td>
+  </tr>
+</table>
+
+<h3>Debugging with SpacetimeDB Logs</h3>
+
+<p>SpacetimeDB captures all <code>log::info!</code> / <code>log::error!</code> output from the module. Use the CLI to read them:</p>
+
+<pre><code><span class="c-cmt"># View recent logs</span>
+<span class="c-fn">spacetime logs</span> zeroclaw
+
+<span class="c-cmt"># Follow logs in real time (like tail -f)</span>
+<span class="c-fn">spacetime logs</span> zeroclaw -f
+
+<span class="c-cmt"># Check the state of stuck tool requests</span>
+<span class="c-fn">spacetime sql</span> zeroclaw <span class="c-str">"SELECT id, tool_name, status, created_at FROM local_tool_requests WHERE status != 'completed' ORDER BY created_at DESC"</span>
+
+<span class="c-cmt"># Inspect recent process results for errors</span>
+<span class="c-fn">spacetime sql</span> zeroclaw <span class="c-str">"SELECT id, status, response FROM process_results ORDER BY id DESC LIMIT 5"</span></code></pre>
+
+<div class="callout">
+  <strong>Debugging tip:</strong> If a conversation seems stuck, check three things in order: (1) Is a worker connected? Query <code>workers</code>. (2) Are there pending tool requests? Query <code>local_tool_requests</code>. (3) Did the last ProcessResult return an error? Query <code>process_results</code>.
+</div>
+
 <!-- ─── Channel Architecture ─── -->
 <h2>Channel Architecture</h2>
 
@@ -387,6 +658,64 @@
       <li>Picks up pending rows and delivers locally</li>
     </ul>
   </div>
+</div>
+
+<!-- ─── Channel Configuration ─── -->
+<h2>Channel Configuration Guide</h2>
+
+<p>The channel architecture routes messages to platforms, but each channel must be configured first. Channel configs are stored in the <code>channel_configs</code> table and created via the <code>configure_channel</code> reducer.</p>
+
+<h3>ChannelConfig Table Structure</h3>
+<pre><code><span class="c-type">ChannelConfig</span> {
+    name:          <span class="c-type">String</span>,   <span class="c-cmt">// unique key, e.g. "telegram", "discord-ops"</span>
+    channel_type:  <span class="c-type">String</span>,   <span class="c-cmt">// "telegram" | "discord" | "slack" | "webhook"</span>
+    credential:    <span class="c-type">String</span>,   <span class="c-cmt">// bot token, webhook URL, or API key</span>
+    api_base_url:  <span class="c-type">String</span>,   <span class="c-cmt">// base URL for the platform API</span>
+    extra_json:    <span class="c-type">String</span>,   <span class="c-cmt">// additional config as JSON (optional)</span>
+}</code></pre>
+
+<h3>Configuring Telegram</h3>
+<pre><code><span class="c-cmt">// 1. Get a bot token from @BotFather on Telegram</span>
+<span class="c-cmt">// 2. Register the channel:</span>
+<span class="c-fn">configure_channel</span>(
+    name:         <span class="c-str">"telegram"</span>,
+    channel_type: <span class="c-str">"telegram"</span>,
+    credential:   <span class="c-str">"7123456789:AAHfiqksKZ..."</span>,    <span class="c-cmt">// your bot token</span>
+    api_base_url: <span class="c-str">"https://api.telegram.org"</span>,
+    extra_json:   <span class="c-str">"{}"</span>,
+)
+
+<span class="c-cmt">// The agent will POST to: https://api.telegram.org/bot{token}/sendMessage</span>
+<span class="c-cmt">// Messages arrive when process_message is called with channel="telegram"</span></code></pre>
+
+<h3>Configuring Discord</h3>
+<pre><code><span class="c-cmt">// 1. Create a webhook in your Discord channel settings</span>
+<span class="c-cmt">// 2. Register the channel:</span>
+<span class="c-fn">configure_channel</span>(
+    name:         <span class="c-str">"discord"</span>,
+    channel_type: <span class="c-str">"discord"</span>,
+    credential:   <span class="c-str">"https://discord.com/api/webhooks/123/abc..."</span>,
+    api_base_url: <span class="c-str">""</span>,    <span class="c-cmt">// not needed for webhooks — URL is the credential</span>
+    extra_json:   <span class="c-str">"{}"</span>,
+)
+
+<span class="c-cmt">// The agent will POST {"content": "..."} to the webhook URL</span></code></pre>
+
+<h3>Configuring Slack</h3>
+<pre><code><span class="c-cmt">// 1. Create an Incoming Webhook in Slack App settings</span>
+<span class="c-cmt">// 2. Register the channel:</span>
+<span class="c-fn">configure_channel</span>(
+    name:         <span class="c-str">"slack"</span>,
+    channel_type: <span class="c-str">"slack"</span>,
+    credential:   <span class="c-str">"https://hooks.slack.com/services/T00/B00/xxxx"</span>,
+    api_base_url: <span class="c-str">""</span>,
+    extra_json:   <span class="c-str">"{}"</span>,
+)
+
+<span class="c-cmt">// The agent will POST {"text": "..."} to the webhook URL</span></code></pre>
+
+<div class="callout">
+  <strong>Fallback behavior:</strong> If a conversation's channel name has no matching entry in <code>channel_configs</code>, the response is written to the <code>pending_sends</code> table instead. The worker (or another client) can subscribe to this table and deliver the message through any custom transport.
 </div>
 
 <!-- ─── Memory System ─── -->
@@ -435,6 +764,133 @@ ZEROCLAW_AGENT_ID=1 \
 
 <div class="callout warn">
   <strong>API key required:</strong> After publishing, call the <code>update_agent</code> reducer to set the LLM API key and model for your agent. Without this, LLM calls will fail.
+</div>
+
+<!-- ─── Environment Variables ─── -->
+<h2>Environment Variables Reference</h2>
+
+<p>The worker binary reads configuration from environment variables. Here is the complete list.</p>
+
+<table>
+  <tr><th>Variable</th><th>Required</th><th>Default</th><th>Description</th></tr>
+  <tr>
+    <td><code>SPACETIME_URI</code></td>
+    <td>No</td>
+    <td><code>ws://localhost:3000</code></td>
+    <td>WebSocket URI of the SpacetimeDB instance</td>
+  </tr>
+  <tr>
+    <td><code>SPACETIME_MODULE</code></td>
+    <td>No</td>
+    <td><code>zeroclaw</code></td>
+    <td>Name of the published SpacetimeDB module to connect to</td>
+  </tr>
+  <tr>
+    <td><code>ZEROCLAW_AGENT_ID</code></td>
+    <td>No</td>
+    <td><code>1</code></td>
+    <td>Agent ID to use for CLI conversations</td>
+  </tr>
+  <tr>
+    <td><code>ZEROCLAW_MODE</code></td>
+    <td>No</td>
+    <td><code>cli</code></td>
+    <td>Worker mode: <code>cli</code> (interactive REPL) or <code>daemon</code> (headless, tool execution only)</td>
+  </tr>
+  <tr>
+    <td><code>ZEROCLAW_WORKER_NAME</code></td>
+    <td>No</td>
+    <td>System hostname</td>
+    <td>Human-readable name for this worker instance, shown in the <code>workers</code> table</td>
+  </tr>
+  <tr>
+    <td><code>RUST_LOG</code></td>
+    <td>No</td>
+    <td><code>info</code></td>
+    <td>Log level filter for the worker binary (standard <code>env_logger</code> syntax)</td>
+  </tr>
+</table>
+
+<h3>Example .env File</h3>
+<pre><code><span class="c-cmt"># Worker configuration for local development</span>
+<span class="c-type">SPACETIME_URI</span>=<span class="c-str">ws://localhost:3000</span>
+<span class="c-type">SPACETIME_MODULE</span>=<span class="c-str">zeroclaw</span>
+<span class="c-type">ZEROCLAW_AGENT_ID</span>=<span class="c-str">1</span>
+<span class="c-type">ZEROCLAW_MODE</span>=<span class="c-str">cli</span>
+<span class="c-type">RUST_LOG</span>=<span class="c-str">info</span>
+
+<span class="c-cmt"># For production daemon mode:</span>
+<span class="c-cmt"># ZEROCLAW_MODE=daemon</span>
+<span class="c-cmt"># SPACETIME_URI=wss://your-spacetimedb-host:3000</span></code></pre>
+
+<!-- ─── Observability ─── -->
+<h2>Observability &amp; Monitoring</h2>
+
+<p>Every state change in ZeroClaw is a table mutation, which means you can monitor the entire system by subscribing to tables. Here is how to observe what the agent is doing.</p>
+
+<h3>Key Tables to Watch</h3>
+<table>
+  <tr><th>Table</th><th>What to Monitor</th><th>Alert Condition</th></tr>
+  <tr>
+    <td><code>local_tool_requests</code></td>
+    <td>Tool execution queue depth and status</td>
+    <td>Rows stuck in <code>pending</code> or <code>processing</code> for &gt; 5 minutes</td>
+  </tr>
+  <tr>
+    <td><code>pending_sends</code></td>
+    <td>Outbound message delivery queue</td>
+    <td>Rows stuck in <code>pending</code> (no worker to deliver them)</td>
+  </tr>
+  <tr>
+    <td><code>process_results</code></td>
+    <td>Agent response status and errors</td>
+    <td>High rate of <code>error</code> or <code>iteration_limit</code> statuses</td>
+  </tr>
+  <tr>
+    <td><code>workers</code></td>
+    <td>Connected worker instances</td>
+    <td>Worker count drops to zero</td>
+  </tr>
+  <tr>
+    <td><code>messages</code></td>
+    <td>Conversation throughput</td>
+    <td>Useful for auditing and analytics</td>
+  </tr>
+</table>
+
+<h3>Subscribing to Tables for Real-Time Monitoring</h3>
+
+<p>Any SpacetimeDB client can subscribe to table changes via WebSocket. Subscriptions receive instant push notifications when rows are inserted, updated, or deleted.</p>
+
+<pre><code><span class="c-cmt">// Rust SDK subscription example (conceptual)</span>
+<span class="c-kw">let</span> conn = <span class="c-type">SpacetimeDbClient</span>::connect(<span class="c-str">"ws://localhost:3000"</span>, <span class="c-str">"zeroclaw"</span>).<span class="c-fn">await</span>?;
+
+<span class="c-cmt">// Subscribe to all tool requests with filtering</span>
+conn.<span class="c-fn">subscribe</span>(<span class="c-str">"SELECT * FROM local_tool_requests WHERE status = 'pending'"</span>).<span class="c-fn">await</span>?;
+
+<span class="c-cmt">// Handle real-time updates</span>
+conn.<span class="c-fn">on_insert</span>::&lt;<span class="c-type">LocalToolRequest</span>&gt;(|_ctx, row| {
+    log::info!(<span class="c-str">"New tool request: {} ({})"</span>, row.tool_name, row.id);
+});
+
+conn.<span class="c-fn">on_update</span>::&lt;<span class="c-type">LocalToolRequest</span>&gt;(|_ctx, _old, new| {
+    <span class="c-kw">if</span> new.status == <span class="c-str">"failed"</span> {
+        log::error!(<span class="c-str">"Tool request {} failed: {}"</span>, new.id, new.result);
+    }
+});</code></pre>
+
+<h3>Hygiene &amp; Automatic Cleanup</h3>
+
+<p>The <code>run_hygiene()</code> scheduled task runs every hour and performs automatic cleanup:</p>
+<ul>
+  <li>Removes <code>local_tool_requests</code> rows with status <code>completed</code> older than 1 hour</li>
+  <li>Removes <code>pending_sends</code> rows with status <code>sent</code> older than 1 hour</li>
+  <li>Resets <code>processing</code> requests from disconnected workers back to <code>pending</code></li>
+  <li>Cleans up stale <code>process_results</code> entries</li>
+</ul>
+
+<div class="callout">
+  <strong>External monitoring integration:</strong> Set up a dedicated agent with a <code>webhook</code> channel config pointing to your monitoring system (PagerDuty, Slack alerts, etc.). Write a simple subscription client that watches for error conditions and calls <code>process_message()</code> to alert the monitoring agent.
 </div>
 
 <!-- ─── Relationship to Main ZeroClaw ─── -->

@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZeroClaw SpacetimeDB — MVP Business Plan</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #c9d1d9; --text-muted: #8b949e;
+    --accent: #58a6ff; --accent-dim: #1f6feb;
+    --green: #3fb950; --orange: #d29922; --red: #f85149;
+    --purple: #bc8cff; --cyan: #39d2c0; --yellow: #e3b341;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+  }
+  .top-nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(13,17,23,0.92); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0.75rem 2rem; display: flex; align-items: center; gap: 1.5rem;
+  }
+  .top-nav .logo { font-weight: 700; font-size: 1.1rem; color: var(--accent); }
+  .top-nav a {
+    color: var(--text-muted); text-decoration: none; font-size: 0.9rem;
+    border-bottom: 2px solid transparent; transition: all 0.2s; padding: 0.25rem 0;
+  }
+  .top-nav a:hover, .top-nav a.active { color: var(--text); border-bottom-color: var(--accent); }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+
+  .page-header {
+    padding: 3.5rem 0 2rem;
+    border-bottom: 1px solid var(--border); margin-bottom: 2rem;
+  }
+  .section-label {
+    display: inline-block; font-size: 0.75rem; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--accent); font-weight: 700; margin-bottom: 0.5rem;
+  }
+  .page-header h1 { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.5rem; }
+  .page-header p { color: var(--text-muted); font-size: 1.05rem; max-width: 700px; }
+  .page-header .meta { color: var(--text-muted); font-size: 0.88rem; margin-top: 0.5rem; }
+
+  h2 {
+    font-size: 1.4rem; margin: 2.5rem 0 0.75rem; padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+  h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+  h3 { font-size: 1.05rem; margin: 1.5rem 0 0.5rem; color: var(--cyan); }
+  h4 { font-size: 0.95rem; margin: 1rem 0 0.4rem; }
+  p { margin-bottom: 0.75rem; font-size: 0.93rem; }
+  ul, ol { margin: 0.5rem 0 1rem 1.5rem; }
+  li { margin-bottom: 0.35rem; font-size: 0.93rem; }
+  strong { color: var(--text); }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  code {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 0.86em; background: var(--surface); padding: 0.15em 0.35em; border-radius: 4px;
+  }
+  pre {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1.25rem; margin: 1rem 0 1.5rem; overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 0.8rem; line-height: 1.55;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  /* Tables */
+  table {
+    width: 100%; border-collapse: collapse;
+    background: var(--surface); border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border); margin: 1rem 0 1.5rem;
+  }
+  th, td { padding: 0.7rem 1rem; text-align: left; font-size: 0.88rem; border-bottom: 1px solid var(--border); }
+  th { background: rgba(88,166,255,0.06); color: var(--accent); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+
+  /* Callouts */
+  .callout {
+    border-left: 3px solid var(--accent); background: rgba(88,166,255,0.04);
+    padding: 1rem 1.25rem; border-radius: 0 8px 8px 0; margin: 1rem 0 1.5rem;
+    font-size: 0.9rem;
+  }
+  .callout.correction { border-left-color: var(--orange); background: rgba(210,153,34,0.04); }
+  .callout.improvement { border-left-color: var(--green); background: rgba(63,185,80,0.04); }
+  .callout.risk { border-left-color: var(--red); background: rgba(248,81,73,0.04); }
+  .callout .label {
+    display: inline-block; font-size: 0.72rem; text-transform: uppercase;
+    letter-spacing: 0.08em; font-weight: 700; margin-bottom: 0.4rem;
+  }
+  .callout.correction .label { color: var(--orange); }
+  .callout.improvement .label { color: var(--green); }
+  .callout.risk .label { color: var(--red); }
+
+  /* Highlight box */
+  .highlight-box {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.5rem; margin: 1.5rem 0;
+  }
+  .kpi-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin: 1rem 0;
+  }
+  .kpi {
+    background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1rem; text-align: center;
+  }
+  .kpi .value { font-size: 1.6rem; font-weight: 800; color: var(--accent); }
+  .kpi .label { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.25rem; }
+
+  /* Architecture diagram */
+  .arch-diagram {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.5rem 2rem; overflow-x: auto; margin: 1.5rem 0;
+  }
+  .arch-diagram pre { background: none; border: none; padding: 0; margin: 0; }
+  .c-accent { color: var(--accent); }
+  .c-green { color: var(--green); }
+  .c-orange { color: var(--orange); }
+  .c-purple { color: var(--purple); }
+  .c-cyan { color: var(--cyan); }
+  .c-muted { color: var(--text-muted); }
+
+  /* Page nav */
+  .page-nav {
+    display: flex; justify-content: space-between; padding: 2rem 0 3rem;
+    border-top: 1px solid var(--border); margin-top: 3rem;
+  }
+  .page-nav a {
+    color: var(--accent); text-decoration: none; font-weight: 600;
+    padding: 0.5rem 1rem; border: 1px solid var(--border); border-radius: 8px;
+    transition: all 0.2s;
+  }
+  .page-nav a:hover { border-color: var(--accent); background: rgba(88,166,255,0.06); }
+
+  footer {
+    border-top: 1px solid var(--border); padding: 2rem;
+    text-align: center; color: var(--text-muted); font-size: 0.85rem;
+  }
+
+  @media (max-width: 700px) {
+    .kpi-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <span class="logo">ZeroClaw</span>
+  <a href="index.html">Overview</a>
+  <a href="technical.html">Technical</a>
+  <a href="implementation.html">Implementation</a>
+  <a href="business-plan.html" class="active">Business Plan</a>
+</nav>
+
+<div class="container">
+
+<div class="page-header">
+  <div class="section-label">MVP Business Plan</div>
+  <h1>ZeroClaw Multi-Agent Hosting on SpacetimeDB</h1>
+  <p>A hosted platform for deploying multi-agent AI systems without managing infrastructure. Users bring their own LLM keys; we provide the real-time, scalable backend.</p>
+  <div class="meta">Prepared: March 2026</div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>1. Executive Summary</h2>
+
+<p><strong>ZeroClaw on SpacetimeDB</strong> is a hosted platform that allows developers and businesses to deploy and run multi-agent AI systems without managing infrastructure. Users bring their own LLM API keys (OpenAI, Anthropic, etc.), while we provide the real-time, scalable backend using SpacetimeDB's database-integrated compute.</p>
+
+<p>The service targets developers who want the power of ZeroClaw's agent framework combined with SpacetimeDB's built-in state synchronisation, multi-tenancy, and low operational overhead.</p>
+
+<h3>Key Value Proposition</h3>
+<ul>
+  <li><strong>No servers to manage</strong> &mdash; SpacetimeDB Cloud handles everything.</li>
+  <li><strong>Real-time multi-agent coordination</strong> out of the box.</li>
+  <li><strong>Users pay only for infrastructure</strong> (storage &amp; compute) &mdash; LLM costs are theirs.</li>
+  <li><strong>Predictable, low monthly cost</strong> starting at $25 for up to 120M reducer calls.</li>
+</ul>
+
+<div class="kpi-grid">
+  <div class="kpi"><div class="value">$25</div><div class="label">Fixed Platform Cost / Month</div></div>
+  <div class="kpi"><div class="value">$1</div><div class="label">Per GB Storage / Month</div></div>
+  <div class="kpi"><div class="value">~10</div><div class="label">Users to Breakeven</div></div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>2. Product Overview</h2>
+
+<p>The platform hosts <strong>ZeroClaw</strong> agents inside SpacetimeDB. Each agent runs as a set of reducers (transactional state functions) and procedures (I/O-capable functions), and communicates with external LLMs via SpacetimeDB's <code>ctx.http</code>.</p>
+
+<h3>Core Components</h3>
+<ul>
+  <li><strong>SpacetimeDB-Native Memory:</strong> Agent memories stored in the <code>memories</code> table with keyword-based recall. Each memory is scoped to an <code>agent_id</code> with category tagging (core, daily, conversation).</li>
+  <li><strong>Agent Isolation:</strong> Every table uses <code>agent_id</code> scoping plus <code>owner: Identity</code> fields enforced via <code>ctx.sender</code> in reducers. This provides per-agent data isolation.</li>
+  <li><strong>LLM Integration:</strong> Procedures call LLM APIs using <code>ctx.http</code> with user-supplied API keys. State is maintained atomically using <code>with_tx</code> blocks within procedures.</li>
+  <li><strong>Real-Time Subscriptions:</strong> Clients subscribe to agent state changes (new messages, tool requests, task completion) via SpacetimeDB's built-in WebSocket subscriptions.</li>
+</ul>
+
+<div class="callout correction">
+  <div class="label">Technical Correction</div>
+  <strong>Isolation is via <code>agent_id</code> + <code>owner: Identity</code>, not <code>user_id</code>.</strong> The current codebase uses SpacetimeDB's <code>Identity</code> type (cryptographic identity from <code>ctx.sender</code>) for ownership, and <code>agent_id</code> for data scoping. There is no <code>user_id</code> column. For a multi-tenant hosted platform, a <code>tenant_id</code> or account-level isolation layer would need to be added above the existing agent-level isolation.
+</div>
+
+<div class="callout correction">
+  <div class="label">Technical Correction</div>
+  <strong>No embeddings in the current SpacetimeDB module.</strong> The original business plan mentions "embeddings" as part of the memory backend. The actual implementation uses keyword-based recall (string matching on words &gt;3 chars) from the <code>memories</code> table, not vector embeddings. The main ZeroClaw codebase (<code>src/memory/</code>) does support embeddings via SQLite+vector, but the SpacetimeDB module does not. Adding embedding support would require either an external embedding API call in the recall path or a SpacetimeDB-native vector type.
+</div>
+
+<div class="callout correction">
+  <div class="label">Technical Correction</div>
+  <strong>API keys are stored in plaintext in the POC.</strong> The code comments note <em>"stored encrypted in production &mdash; plaintext here for POC"</em> but no encryption is currently implemented. For a hosted platform, this is a critical gap. Options: use SpacetimeDB's planned secret storage, implement application-level encryption (e.g., ChaCha20-Poly1305 as the main ZeroClaw codebase does), or store keys in an external secret manager and pass references.
+</div>
+
+<p><strong>Current Status:</strong> MVP code is complete for core orchestration. Encryption, tenant isolation, and embedding-based recall are identified as pre-launch requirements for a hosted service.</p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>3. Market Opportunity</h2>
+
+<h3>Target Audience</h3>
+<ul>
+  <li>Developers building personal AI assistants.</li>
+  <li>Small teams creating multi-agent applications (e.g., game NPCs, collaborative bots).</li>
+  <li>Hobbyists and researchers who want to experiment with agent frameworks without DevOps.</li>
+</ul>
+
+<h3>Market Trends</h3>
+<ul>
+  <li>Explosive growth in AI agent frameworks (AutoGPT, LangChain, CrewAI, ZeroClaw).</li>
+  <li>Increasing demand for managed hosting solutions that abstract away infrastructure.</li>
+  <li>SpacetimeDB's novel architecture is gaining traction in gaming and real-time apps &mdash; we are early to combine it with agents.</li>
+</ul>
+
+<h3>Competitive Landscape</h3>
+<table>
+  <tr><th>Competitor</th><th>Approach</th><th>Our Advantage</th></tr>
+  <tr>
+    <td>Self-hosted ZeroClaw</td>
+    <td>Free but requires managing servers, databases, scaling</td>
+    <td>Zero-ops deployment with <code>spacetime publish</code></td>
+  </tr>
+  <tr>
+    <td>LangChain Cloud / AgentGPT</td>
+    <td>Hosted agent platforms with proprietary backends</td>
+    <td>Built-in real-time multi-agent sync via SpacetimeDB subscriptions</td>
+  </tr>
+  <tr>
+    <td>Custom solutions</td>
+    <td>Server + DB + queue + cache stack</td>
+    <td>Single-component architecture: ACID transactions, state, and I/O in one place</td>
+  </tr>
+</table>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>4. Business Model</h2>
+
+<p>Users pay a <strong>monthly subscription fee</strong> for access to the platform. Because users supply their own LLM keys, our costs are limited to SpacetimeDB infrastructure.</p>
+
+<h3>Pricing Tiers (Proposed)</h3>
+<table>
+  <tr><th>Tier</th><th>Price</th><th>Included</th><th>Overage</th></tr>
+  <tr>
+    <td><strong>Free</strong></td>
+    <td>$0</td>
+    <td>1 agent, 100 MB storage, 10K reducer calls/month</td>
+    <td>&mdash;</td>
+  </tr>
+  <tr>
+    <td><strong>Pro</strong></td>
+    <td>$5/user/month</td>
+    <td>5 agents, 1 GB storage, unlimited reducer calls (fair use)</td>
+    <td>&mdash;</td>
+  </tr>
+  <tr>
+    <td><strong>Business</strong></td>
+    <td>$50/month</td>
+    <td>20 agents, 10 GB storage, priority support</td>
+    <td>Custom</td>
+  </tr>
+</table>
+
+<p><em>Note: These are placeholder numbers; we will adjust based on early feedback.</em></p>
+
+<h3>Revenue Streams</h3>
+<ul>
+  <li><strong>Subscription fees</strong> (core).</li>
+  <li>Potential future add-ons: dedicated instances, analytics, enterprise SLAs.</li>
+</ul>
+
+<div class="callout improvement">
+  <div class="label">Improvement Note</div>
+  <strong>Consider usage-based pricing for reducer calls.</strong> The "unlimited reducer calls (fair use)" on Pro tier is ambiguous. Each <code>process_message()</code> invocation triggers multiple reducer/procedure calls (store message, recall memory, call LLM, store response, send channel). A single user conversation turn may use 10-20 reducer calls. Tracking and billing by "agent-hours" or "conversation turns" would be more predictable for both the business and users.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>5. Technical Architecture</h2>
+
+<div class="arch-diagram"><pre>
+┌─────────────────┐     ┌──────────────────────────────────────────┐     ┌─────────────┐
+│                 │     │        <span class="c-accent">SpacetimeDB Cloud</span>                  │     │             │
+│   Users' Apps   │────▶│                                          │────▶│  <span class="c-purple">LLM APIs</span>   │
+│ (Web/Mobile/CLI)│     │  ┌────────────────────────────────────┐  │     │ (OpenAI,    │
+│                 │◀────│  │ <span class="c-cyan">ZeroClaw Agent Module</span>              │  │     │  Anthropic, │
+└─────────────────┘     │  │                                    │  │     │  etc.)      │
+      WebSocket         │  │ <span class="c-green">Reducers</span> (state):                  │  │     └──────┬──────┘
+      subscriptions     │  │   create_agent, store_memory,      │  │            │
+                        │  │   set_security_policy,             │  │            │
+                        │  │   submit_local_tool_result         │  │       user's API key
+                        │  │                                    │  │       (via <span class="c-orange">ctx.http</span>)
+                        │  │ <span class="c-purple">Procedures</span> (I/O):                  │  │
+                        │  │   process_message,                 │  │
+                        │  │   continue_conversation,           │  │
+                        │  │   send_channel_message             │  │
+                        │  │                                    │  │
+                        │  │ <span class="c-orange">Tables</span>:                            │  │
+                        │  │   agents, conversations, messages,  │  │
+                        │  │   memories, security_policies,      │  │
+                        │  │   tool_registry, local_tool_requests│  │
+                        │  └────────────────────────────────────┘  │
+                        │                                          │
+                        │  State sync via <span class="c-accent">with_tx</span> blocks            │
+                        │  (atomicity within procedures)           │
+                        └───────────────────┬──────────────────────┘
+                                            │
+                              WebSocket (subscriptions)
+                                            │
+                        ┌───────────────────┴──────────────────────┐
+                        │          <span class="c-green">Worker</span> (optional)                │
+                        │   Shell exec, filesystem, hardware       │
+                        │   Only needed for local tool execution   │
+                        └──────────────────────────────────────────┘
+</pre></div>
+
+<h3>Key Technical Decisions (with rationale)</h3>
+<ul>
+  <li><strong>SpacetimeDB Pro Tier ($25/month):</strong> Provides 100,000 TeV/month (~120M reducer calls), enough for thousands of active users.</li>
+  <li><strong>Procedures for LLM calls:</strong> Use SpacetimeDB's <code>"unstable"</code> feature to enable <code>ctx.http</code> for outbound HTTP inside procedures. Atomicity maintained via <code>with_tx</code> blocks for interleaved state reads/writes.</li>
+  <li><strong>Storage at $1/GB/month:</strong> Allows generous per-user memory (e.g., 50 MB/user costs only $0.05/user/month).</li>
+</ul>
+
+<div class="callout correction">
+  <div class="label">Technical Correction</div>
+  <strong>Procedures use <code>"unstable"</code> feature, not "beta".</strong> The <code>Cargo.toml</code> specifies <code>spacetimedb = { version = "2.0", features = ["unstable"] }</code>. This is a SpacetimeDB feature gate, not a general beta label. The <code>ProcedureContext</code> type (which provides <code>ctx.http</code>) is only available with this feature. The original plan's reference to "beta feature" should be understood as "unstable API that may change between SpacetimeDB versions."
+</div>
+
+<div class="callout correction">
+  <div class="label">Technical Correction</div>
+  <strong>Atomicity model is <code>with_tx</code>, not full-procedure transactions.</strong> Unlike reducers (which are fully transactional), procedures use explicit <code>ctx.with_tx(|tx| { ... })</code> blocks for table operations. Each <code>with_tx</code> block is atomic, but the procedure as a whole is not &mdash; HTTP calls between <code>with_tx</code> blocks can fail, leaving partial state. The orchestration loop handles this by storing messages incrementally and using status fields (<code>pending</code>/<code>completed</code>/<code>failed</code>) for recovery.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>6. Cost Structure</h2>
+
+<h3>Fixed Monthly Costs</h3>
+<table>
+  <tr><th>Item</th><th>Cost</th></tr>
+  <tr><td>SpacetimeDB Pro subscription</td><td>$25</td></tr>
+  <tr><td>Domain name &amp; basic hosting (landing page)</td><td>~$10</td></tr>
+  <tr><td><strong>Total Fixed</strong></td><td><strong>~$35</strong></td></tr>
+</table>
+
+<h3>Variable Costs (scales with users)</h3>
+<ul>
+  <li><strong>Storage:</strong> $1 per GB per month. <em>Example:</em> 100 users x 50 MB each = 5 GB &rarr; $5/month.</li>
+  <li><strong>Overage (if &gt;120M reducer calls):</strong> Not yet priced by SpacetimeDB, estimated at fractions of a cent per 1,000 calls.</li>
+</ul>
+
+<h3>Cost Per User (Illustrative)</h3>
+<table>
+  <tr><th>Users</th><th>Storage/User</th><th>Storage Cost</th><th>Total Monthly</th><th>Cost/User</th></tr>
+  <tr><td>100</td><td>50 MB</td><td>$5</td><td>$40</td><td>$0.40</td></tr>
+  <tr><td>500</td><td>50 MB</td><td>$25</td><td>$60</td><td>$0.12</td></tr>
+  <tr><td>2,000</td><td>50 MB</td><td>$100</td><td>$135</td><td>$0.07</td></tr>
+</table>
+
+<div class="callout improvement">
+  <div class="label">Improvement Note</div>
+  <strong>Factor in reducer call density per user.</strong> A single <code>process_message()</code> call can execute 5-15 <code>with_tx</code> blocks depending on whether tools are involved. With 10 messages/day per active user and ~10 tx blocks per message, that's ~100 reducer-equivalent calls/user/day. At 120M calls/month, this supports ~40,000 daily-active users &mdash; well within the Pro tier for early growth. But monitoring TeV consumption per user will be critical for pricing accuracy.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>7. Risk Analysis</h2>
+
+<table>
+  <tr><th>Risk</th><th>Likelihood</th><th>Impact</th><th>Mitigation</th></tr>
+  <tr>
+    <td>Low demand</td><td>Medium</td><td>High</td>
+    <td>Validate with early community; focus on specific use cases (games, personal assistants).</td>
+  </tr>
+  <tr>
+    <td>SpacetimeDB procedure instability</td><td>Medium</td><td>High</td>
+    <td>Aggressive testing; implement retries; monitor error rates closely post-launch.</td>
+  </tr>
+  <tr>
+    <td>Multi-tenant data leakage</td><td>Low</td><td>High</td>
+    <td>Enforce <code>ctx.sender</code> checks in every reducer; conduct security audit before public launch.</td>
+  </tr>
+  <tr>
+    <td>LLM key abuse</td><td>Medium</td><td>Medium</td>
+    <td>Implement basic content filtering; clear terms of service; logging for audit trails.</td>
+  </tr>
+  <tr>
+    <td>ZeroClaw integration bugs</td><td>Low</td><td>Medium</td>
+    <td>Soak testing; verbose logging; quick rollback capability.</td>
+  </tr>
+  <tr>
+    <td>Cost overruns</td><td>Low</td><td>Medium</td>
+    <td>Set billing alerts; monitor TeV usage daily; cap free tier usage.</td>
+  </tr>
+  <tr>
+    <td>Platform outage</td><td>Low</td><td>High</td>
+    <td>Communicate transparently; offer data export option.</td>
+  </tr>
+  <tr>
+    <td>Open source competition</td><td>High</td><td>High</td>
+    <td>Differentiate with real-time multi-agent features and managed convenience.</td>
+  </tr>
+  <tr>
+    <td>Solo founder burnout</td><td>Medium</td><td>High</td>
+    <td>Document processes; consider co-founder; automate support with FAQs.</td>
+  </tr>
+</table>
+
+<div class="callout risk">
+  <div class="label">Additional Risk Identified</div>
+  <strong>API key storage without encryption.</strong> The current POC stores LLM API keys in plaintext in the <code>agents</code> table. Since all tables are marked <code>public</code> (subscribable), any connected client could theoretically read other agents' API keys via table subscriptions. This is a <strong>launch-blocking security issue</strong> for a hosted platform. Mitigation: (1) Remove <code>public</code> from the <code>agents</code> table, (2) encrypt API keys at rest, (3) only decrypt inside procedures, never expose via subscriptions.
+</div>
+
+<div class="callout risk">
+  <div class="label">Additional Risk Identified</div>
+  <strong>All tables are <code>public</code> (subscribable by any connected client).</strong> In the current implementation, every table uses <code>#[spacetimedb::table(name = ..., public)]</code>. For a hosted multi-tenant platform, this means any connected user could subscribe to and read all agents' data, memories, conversations, and security policies. Mitigation: Use SpacetimeDB's <code>private</code> table visibility combined with row-level security checks, or implement a gateway layer that filters subscriptions per tenant.
+</div>
+
+<div class="callout improvement">
+  <div class="label">Improvement Note</div>
+  <strong>Add a rate limiter to <code>process_message()</code>.</strong> The <code>security_policies</code> table has a <code>rate_limit_per_minute</code> field, but the current orchestration loop doesn't enforce it. For a hosted platform with free-tier users, this would be essential to prevent abuse and control costs.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>8. Go-to-Market Strategy</h2>
+
+<h3>Phase 1: Pre-Launch (Now)</h3>
+<ul>
+  <li>Set up landing page with value proposition and waitlist.</li>
+  <li>Create documentation: how to connect ZeroClaw, bring LLM key, pricing.</li>
+  <li>Prepare Discord server for community.</li>
+</ul>
+
+<h3>Phase 2: Soft Launch (Week 1)</h3>
+<ul>
+  <li>Invite 10&ndash;20 beta users from ZeroClaw Discord, SpacetimeDB community.</li>
+  <li>Offer free usage in exchange for feedback.</li>
+  <li>Monitor technical metrics (reducer calls, errors, storage).</li>
+</ul>
+
+<h3>Phase 3: Public Launch (Week 4)</h3>
+<ul>
+  <li>Announce on Product Hunt, Reddit (r/LocalLLaMA, r/selfhosted), AI newsletters.</li>
+  <li>Introduce paid tiers with early-bird discount.</li>
+  <li>Implement referral program.</li>
+</ul>
+
+<h3>Phase 4: Growth (Month 2&ndash;6)</h3>
+<ul>
+  <li>Iterate based on feedback.</li>
+  <li>Add features: team accounts, analytics dashboard, custom domains.</li>
+  <li>Explore partnerships with AI tool directories.</li>
+</ul>
+
+<div class="callout improvement">
+  <div class="label">Improvement Note</div>
+  <strong>Pre-launch security hardening is a prerequisite.</strong> Before any external users have access, the following must be completed: (1) Make <code>agents</code> table private (API keys), (2) Add tenant-level isolation above <code>agent_id</code>, (3) Enforce <code>rate_limit_per_minute</code> in the orchestration loop, (4) Add input validation/sanitization for tool parameters, (5) Implement API key encryption. These should be tracked as launch-blocking items, not post-launch improvements.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>9. Financial Projections (First 6 Months)</h2>
+
+<p><em>Assumptions:</em> Pro tier ($5/user) adopted by 5% of free users. Storage costs $1/GB. Fixed costs $35/month.</p>
+
+<table>
+  <tr><th>Month</th><th>Free Users</th><th>Paid Users</th><th>Revenue</th><th>Storage Cost</th><th>Platform Cost</th><th>Profit</th></tr>
+  <tr><td>1</td><td>50</td><td>0</td><td>$0</td><td>$2</td><td>$35</td><td style="color: var(--red);">-$37</td></tr>
+  <tr><td>2</td><td>100</td><td>5</td><td>$25</td><td>$5</td><td>$35</td><td style="color: var(--red);">-$15</td></tr>
+  <tr><td>3</td><td>200</td><td>15</td><td>$75</td><td>$10</td><td>$35</td><td style="color: var(--green);">$30</td></tr>
+  <tr><td>4</td><td>400</td><td>30</td><td>$150</td><td>$20</td><td>$35</td><td style="color: var(--green);">$95</td></tr>
+  <tr><td>5</td><td>600</td><td>50</td><td>$250</td><td>$30</td><td>$35</td><td style="color: var(--green);">$185</td></tr>
+  <tr><td>6</td><td>800</td><td>80</td><td>$400</td><td>$40</td><td>$35</td><td style="color: var(--green);">$325</td></tr>
+</table>
+
+<p><em>Breakeven expected by Month 3.</em></p>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>10. Milestones (Next 90 Days)</h2>
+
+<table>
+  <tr><th>Date</th><th>Milestone</th></tr>
+  <tr><td>Day 1</td><td>Launch MVP to beta testers</td></tr>
+  <tr><td>Week 2</td><td>Gather feedback, fix critical bugs</td></tr>
+  <tr><td>Week 4</td><td>Public launch on Product Hunt and forums</td></tr>
+  <tr><td>Week 6</td><td>First 10 paying customers</td></tr>
+  <tr><td>Week 8</td><td>Implement referral program</td></tr>
+  <tr><td>Week 12</td><td>Evaluate feature roadmap for next iteration</td></tr>
+</table>
+
+<div class="callout improvement">
+  <div class="label">Improvement Note</div>
+  <strong>Insert a "Week 0" security hardening milestone.</strong> The current milestones start with "Launch MVP to beta testers" but skip the security prerequisites identified above. Recommended insertion: <strong>Week 0:</strong> Complete security hardening (private tables, API key encryption, tenant isolation, rate limiting enforcement). This should gate the Day 1 launch.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2>11. Conclusion</h2>
+
+<p>The ZeroClaw-on-SpacetimeDB platform addresses a clear need: easy, scalable hosting for multi-agent AI systems with minimal operational cost. With the MVP already built and a clear understanding of costs and risks, we are positioned to launch quickly and iterate based on real user feedback. The low fixed costs make this a viable micro-investment with significant upside.</p>
+
+<p><strong>Next Step:</strong> Complete security hardening, launch the beta, monitor closely, and start building a community.</p>
+
+<div class="highlight-box">
+  <p style="font-size: 0.85rem; color: var(--text-muted); margin: 0;"><em>This plan incorporates insights from detailed technical, cost, and risk analysis conducted during the planning phase. All cost estimates are based on SpacetimeDB's published pricing as of March 2026. Technical corrections and improvement notes are based on code review of the actual implementation.</em></p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════ -->
+<h2 id="technical-review">Technical Review Summary</h2>
+
+<p>The following corrections and improvements were identified by reviewing the business plan against the actual SpacetimeDB module source code (<code>spacetime/server/src/lib.rs</code> and <code>spacetime/worker/src/main.rs</code>).</p>
+
+<h3>Corrections Made (5)</h3>
+<table>
+  <tr><th>#</th><th>Original Claim</th><th>Actual Implementation</th><th>Impact</th></tr>
+  <tr>
+    <td>1</td>
+    <td>"Every table includes a <code>user_id</code> column"</td>
+    <td>Tables use <code>agent_id</code> + <code>owner: Identity</code> (via <code>ctx.sender</code>)</td>
+    <td>Medium &mdash; isolation model needs tenant layer for hosted platform</td>
+  </tr>
+  <tr>
+    <td>2</td>
+    <td>"Memory backend stores embeddings"</td>
+    <td>Keyword-based recall only (word matching &gt;3 chars), no vector embeddings</td>
+    <td>Medium &mdash; semantic search quality limited until embeddings added</td>
+  </tr>
+  <tr>
+    <td>3</td>
+    <td>"API keys stored encrypted"</td>
+    <td>Plaintext in POC (code comment notes encryption for production)</td>
+    <td>Critical &mdash; launch-blocking for hosted service</td>
+  </tr>
+  <tr>
+    <td>4</td>
+    <td>"Procedures (beta feature)"</td>
+    <td>Requires SpacetimeDB <code>"unstable"</code> feature flag, not a general beta</td>
+    <td>Low &mdash; terminology clarification</td>
+  </tr>
+  <tr>
+    <td>5</td>
+    <td>"Atomicity via procedures"</td>
+    <td>Procedures use explicit <code>with_tx</code> blocks; not fully transactional end-to-end</td>
+    <td>Medium &mdash; partial-state recovery design needed for production</td>
+  </tr>
+</table>
+
+<h3>Improvements Identified (6)</h3>
+<table>
+  <tr><th>#</th><th>Improvement</th><th>Priority</th></tr>
+  <tr><td>1</td><td>Make <code>agents</code> table private (API keys visible via public subscriptions)</td><td style="color: var(--red);">Critical / Pre-launch</td></tr>
+  <tr><td>2</td><td>Add tenant-level isolation above <code>agent_id</code> for multi-user hosting</td><td style="color: var(--red);">Critical / Pre-launch</td></tr>
+  <tr><td>3</td><td>Implement API key encryption at rest</td><td style="color: var(--red);">Critical / Pre-launch</td></tr>
+  <tr><td>4</td><td>Enforce <code>rate_limit_per_minute</code> in the orchestration loop</td><td style="color: var(--orange);">High / Pre-launch</td></tr>
+  <tr><td>5</td><td>Add embedding-based memory recall (or external embedding API)</td><td style="color: var(--text-muted);">Medium / Post-launch</td></tr>
+  <tr><td>6</td><td>Switch to usage-based pricing (conversation turns vs. "unlimited")</td><td style="color: var(--text-muted);">Medium / Post-launch</td></tr>
+</table>
+
+<!-- ─── Page Navigation ─── -->
+<div class="page-nav">
+  <a href="implementation.html">&larr; Implementation</a>
+  <a href="index.html">Back to Overview &rarr;</a>
+</div>
+
+</div>
+
+<footer>ZeroClaw &mdash; SpacetimeDB Agent Runtime &mdash; MVP Business Plan</footer>
+
+</body>
+</html>

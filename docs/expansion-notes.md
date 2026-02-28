@@ -1,4 +1,4 @@
-# Expansion Notes: SpacetimeDB Documentation Gaps
+# Expansion Notes for SpacetimeDB Documentation
 
 Reviewed 2026-02-28 from a junior developer ("newbie") perspective.
 
@@ -6,167 +6,176 @@ Reviewed 2026-02-28 from a junior developer ("newbie") perspective.
 
 ## 1. Quickstart / Getting Started Guide
 
-**Why it's needed:** The docs jump straight into architecture concepts without telling a new developer how to actually get the system running. There is no step-by-step "zero to working agent" guide. The Deployment Topology section in technical.html shows three commands but lacks prerequisite installation, expected output, and verification steps.
+**Why it's needed:** The docs jump straight into concepts and architecture. A newcomer has no idea how to actually get the system running. The deployment section in technical.html shows three commands but skips prerequisites, expected output, and verification steps.
 
 **What should be added:**
-- Prerequisites checklist (Rust toolchain version, SpacetimeDB CLI install, OS support)
-- Step-by-step quickstart: install SpacetimeDB, clone repo, publish module, configure agent, start worker, send first message
-- Expected terminal output at each step so the reader can verify success
-- A "You should see this" confirmation at the end
+- Prerequisites checklist: Rust toolchain version, SpacetimeDB CLI installation, supported OS
+- Step-by-step "Hello World" flow: install SpacetimeDB CLI, publish the module, start the worker, send a test message
+- Expected terminal output at each step so the reader knows they're on track
+- A "verify it works" check at the end
 
-**Which file:** index.html (new section before the CTA row at the bottom)
+**Which file:** `index.html` (new section before the CTA row at the bottom)
 
 ---
 
 ## 2. Environment Variables Reference
 
-**Why it's needed:** The worker uses environment variables like `SPACETIME_URI`, `SPACETIME_MODULE`, and `ZEROCLAW_AGENT_ID`, but these are only mentioned in passing inside a code block. A new developer wouldn't know which are required vs optional, what the defaults are, or whether there are additional env vars for things like log level or daemon mode.
+**Why it's needed:** The worker uses `SPACETIME_URI`, `SPACETIME_MODULE`, and `ZEROCLAW_AGENT_ID`, but these are only shown once in a deployment code snippet with no explanation. A newcomer wouldn't know which are required vs optional, what the defaults are, or what other env vars exist.
 
 **What should be added:**
-- Complete table of all environment variables with name, required/optional, default value, and description
-- Example `.env` file snippet
+- Complete table of all environment variables
+- Required vs optional designation
+- Default values
+- Description and example values for each
 
-**Which file:** technical.html (new section after Deployment Topology)
+**Which file:** `technical.html` (new section after Deployment Topology)
 
 ---
 
 ## 3. End-to-End Request/Response Example
 
-**Why it's needed:** The flow diagram in index.html is abstract. A newbie needs to see what an actual API call looks like -- the real JSON payloads going to the LLM, the real tool call structure coming back, and the real tool result being submitted. Without this, the "how" remains theoretical.
+**Why it's needed:** The orchestration loop is described abstractly. A newcomer can't visualize what actual JSON goes over the wire. There's no concrete example showing "user sends X, LLM receives Y, agent responds Z."
 
 **What should be added:**
-- Concrete example: user sends "What's the weather in Tokyo?", agent calls web_search tool, gets result, responds
-- Show the actual JSON body sent to the LLM API
-- Show the LLM response with tool_calls
-- Show the tool result stored as a message
-- Show the final response sent to the channel
+- A concrete scenario: user asks "What's the weather in Tokyo?"
+- Show the actual JSON that goes to the LLM API
+- Show the LLM response with a tool_call for web_search
+- Show the HTTP tool execution and its result
+- Show the second LLM call with the tool result
+- Show the final response back to the user
 
-**Which file:** technical.html (new section after Orchestration Loop)
+**Which file:** `technical.html` (new section after Orchestration Loop)
 
 ---
 
-## 4. Adding a Custom Tool Guide
+## 4. How to Add a Custom Tool
 
-**Why it's needed:** The docs explain the built-in tools (web_search, shell, etc.) but never explain how a developer would add their own custom tool. This is the most common extension task for anyone using the system. The tool_registry table exists but there is no walkthrough of registering a new HTTP tool or a new local tool.
+**Why it's needed:** The docs explain existing tools but give no guidance on adding new ones. The tool_registry table and execution_mode field hint at extensibility, but a newcomer wouldn't know the concrete steps.
 
 **What should be added:**
-- Step-by-step: adding a custom HTTP tool (register in tool_registry, add match arm in execute_http_tool)
-- Step-by-step: adding a custom local tool (register via worker, add match arm in execute_local_tool)
-- Example: adding a "get_stock_price" HTTP tool with full code
+- Step-by-step guide for adding an HTTP tool (e.g., a weather API tool)
+- Step-by-step guide for adding a local tool (e.g., a database query tool)
+- Where to register the tool (server init vs worker startup vs runtime reducer call)
+- JSON schema format for tool parameters
+- How the tool appears to the LLM
 
-**Which file:** implementation.html (new section after HTTP Tool Execution)
+**Which file:** `implementation.html` (new section after HTTP Tool Execution)
 
 ---
 
-## 5. Error Handling and Debugging Guide
+## 5. Error Handling and Debugging
 
-**Why it's needed:** The docs show the happy path exclusively. A new developer will inevitably hit errors: LLM API key not set, worker not connected, tool execution failures, rate limits exceeded. There is no guidance on what error messages look like, where to find logs, or how to diagnose common problems.
+**Why it's needed:** The docs show happy paths exclusively. A newcomer will immediately hit errors (wrong API key, SpacetimeDB not running, worker can't connect) and has no idea how to diagnose them. Error states like "failed" in tool requests are mentioned but never explained.
 
 **What should be added:**
-- Common error scenarios and their symptoms (API key missing, worker disconnected, tool blocked by policy, iteration limit hit)
-- Where logs appear (SpacetimeDB logs, worker stdout)
-- How to inspect state via SpacetimeDB SQL queries (select from local_tool_requests where status = 'failed')
-- Troubleshooting checklist
+- Common error scenarios and their symptoms
+- How to read SpacetimeDB logs
+- What happens when the LLM API key is missing or wrong
+- What happens when the worker disconnects mid-tool-execution
+- How to inspect the state of pending tool requests
+- ProcessResult status codes and what each means
 
-**Which file:** technical.html (new section after Memory Architecture)
+**Which file:** `technical.html` (new section after Security Model)
 
 ---
 
 ## 6. Worker Reconnection and Resilience
 
-**Why it's needed:** The docs mention the worker connects via WebSocket but never explain what happens when the connection drops. A new developer deploying this in production needs to know: Does the worker auto-reconnect? What happens to in-flight tool requests? Is there a heartbeat? What about stale worker entries in the workers table?
+**Why it's needed:** The docs mention the worker subscribes to tables via WebSocket but say nothing about what happens on disconnect. A newcomer deploying this in production needs to know: Does the worker auto-reconnect? What happens to in-flight tool requests? Are there retries?
 
 **What should be added:**
-- Worker connection lifecycle: connect, register, subscribe, disconnect handling
-- Reconnection strategy (exponential backoff, re-registration of tools)
+- Worker lifecycle: connect, register, subscribe, execute, disconnect
 - What happens to pending tool requests when a worker disconnects
-- How on_disconnect cleans up the workers table
-- How hygiene_schedule cleans up stale requests
+- Whether and how the worker reconnects automatically
+- The on_disconnect handler and worker table cleanup
+- How stale "processing" requests are recovered
 
-**Which file:** technical.html (new section after Channel Architecture, or expand the existing Worker section)
+**Which file:** `technical.html` (new section after Local Tools)
 
 ---
 
-## 7. Monitoring and Observability
+## 7. Observability and Monitoring
 
-**Why it's needed:** The overview page lists "Observability -- Every state change is a table mutation (subscribable)" as a design principle, but there is zero elaboration. A new developer has no idea how to actually monitor what the agent is doing, track conversation flow, or set up alerts.
+**Why it's needed:** One of the design principles listed is "Observability -- Every state change is a table mutation (subscribable)" but there's zero practical guidance on how to actually observe the system. A newcomer doesn't know how to watch what the agent is doing in real time.
 
 **What should be added:**
-- How to subscribe to table changes for monitoring
-- Key tables to watch for operational health (local_tool_requests status, pending_sends status, workers table)
-- Example subscription queries for common monitoring scenarios
-- How process_results table can be used to track agent performance
-- Integration points for external monitoring (webhook channel for alerts)
+- How to subscribe to tables for real-time monitoring
+- Key tables to watch (local_tool_requests, pending_sends, messages, process_results)
+- Using SpacetimeDB CLI commands to query state
+- Example subscription queries for debugging
+- The hygiene_schedule and what run_hygiene() cleans up
 
-**Which file:** technical.html (new section near the end, after the expanded Worker section)
+**Which file:** `technical.html` (new section after Deployment Topology / Environment Variables)
 
 ---
 
 ## 8. Security Policy Configuration Examples
 
-**Why it's needed:** The security model section shows the SecurityPolicy struct and the is_tool_allowed logic, but never shows practical examples of configuring different security postures. A new developer wouldn't know how to set up a read-only agent, a fully autonomous agent, or an agent restricted to specific tools.
+**Why it's needed:** The security model section shows the struct and the authorization logic, but never shows a concrete example of setting up a restrictive policy. A newcomer reading about allowed_tools_json and blocked_tools_json needs to see actual reducer calls with real values.
 
 **What should be added:**
-- Example: read-only agent (block shell and file_write)
-- Example: full autonomy (empty allowlist, empty blocklist, auto mode)
-- Example: restricted agent (only web_search and memory tools allowed)
-- How to update security policy at runtime via reducer call
-- Explanation of autonomy_level values and their behavioral impact
+- Example: create a read-only agent (block shell and file_write)
+- Example: create a restricted agent (allow only web_search and memory tools)
+- Example: set rate limits for a public-facing agent
+- Show the actual reducer calls with parameters
 
-**Which file:** technical.html (expand the existing Security Model section)
+**Which file:** `implementation.html` (new section after Security Policy Enforcement)
 
 ---
 
-## 9. How continue_conversation() Works
+## 9. The continue_conversation() Flow
 
-**Why it's needed:** The orchestration loop clearly shows that local tools cause the procedure to return with status "awaiting_local_tools", but the resumption path via continue_conversation() is only mentioned in passing. A new developer cannot trace the full lifecycle of a local tool request from creation to result submission to conversation resumption.
+**Why it's needed:** The docs show that local tools cause the orchestration to pause and return "awaiting_local_tools", and they mention continue_conversation() resumes the loop. But there's no code or explanation showing how the worker triggers this, what the procedure does internally, or how the conversation state is restored.
 
 **What should be added:**
-- The continue_conversation() procedure code (annotated)
-- How submit_local_tool_result triggers continue_conversation
-- The full lifecycle diagram: process_message -> awaiting -> worker executes -> submit_result -> continue_conversation -> LLM again
-- What happens if multiple local tools are pending (batch vs sequential)
+- The continue_conversation() procedure signature and logic
+- How the worker calls it after submitting tool results
+- How the conversation state (tool_iteration counter) is managed
+- What happens if only some tool results have been submitted
 
-**Which file:** implementation.html (new section after the Worker section or expand orchestration_loop section)
+**Which file:** `implementation.html` (new section after the orchestration loop)
 
 ---
 
-## 10. Autonomy Levels Explained
+## 10. Channel Configuration Guide
 
-**Why it's needed:** The security policy has an autonomy_level field with values "manual", "semi_auto", and "auto", but the docs never explain what these actually do behaviorally. Does "manual" require human approval for every tool call? Does "auto" skip confirmation? Where is the approval mechanism? A newbie has no idea.
+**Why it's needed:** The channel architecture section shows that Telegram, Discord, Slack, and webhooks are supported, but never shows how to actually configure one. The channel_configs table is mentioned but its structure isn't shown, and there's no example of adding a Telegram bot.
 
 **What should be added:**
-- Definition of each autonomy level and its behavioral impact
-- How manual mode works (if it queues for approval, where/how does the human approve?)
-- How semi_auto differs from auto
-- Whether autonomy level affects the orchestration loop or is informational only
+- ChannelConfig table structure
+- Step-by-step: configure a Telegram channel
+- Step-by-step: configure a Discord webhook
+- How to verify channel config is working
+- What happens when channel config is missing (fallback to pending_sends)
 
-**Which file:** technical.html (expand within the Security Model section)
+**Which file:** `technical.html` (new section after Channel Architecture)
 
 ---
 
-## 11. SpacetimeDB Concepts Primer
+## 11. Glossary of Status Codes and State Machines
 
-**Why it's needed:** The docs assume familiarity with SpacetimeDB concepts like reducers, procedures, ProcedureContext, ctx.http, tables, subscriptions, Identity, and ScheduleAt. A developer who has never seen SpacetimeDB before will be lost by the second paragraph. The relationship between reducers (state changes) and procedures (I/O) is crucial but never explicitly defined.
+**Why it's needed:** The docs mention several status values throughout (pending, processing, completed, failed, awaiting_local_tools, iteration_limit, error) but never collect them in one place. A newcomer debugging a stuck conversation needs a quick reference for what each state means and what transitions are valid.
 
 **What should be added:**
-- Brief glossary: what is a reducer, what is a procedure, what is a subscription, what is Identity
-- Why procedures can do HTTP but reducers cannot
-- How real-time subscriptions work (WebSocket push on table changes)
-- Link to SpacetimeDB official docs for deeper reading
+- ProcessResult status codes: completed, awaiting_local_tools, error, iteration_limit
+- LocalToolRequest states: pending -> processing -> completed | failed
+- PendingSend states: pending -> sent | failed
+- Conversation.active field semantics
+- State transition diagram for the full message lifecycle
 
-**Which file:** index.html (new section before the concept grid, serving as foundational context)
+**Which file:** `index.html` (new section after the Message Lifecycle flow diagram)
 
 ---
 
-## 12. Channel Configuration Setup
+## 12. SpacetimeDB CLI Commands Cheat Sheet
 
-**Why it's needed:** The channel architecture section explains the send mechanism but never shows how to actually configure a channel. The channel_configs table is mentioned but a new developer doesn't know how to add Telegram bot credentials, Discord webhook URLs, or Slack integration. This is a critical setup step that's completely missing.
+**Why it's needed:** The docs reference `spacetime publish` and `spacetime generate` but a newcomer doesn't know what other SpacetimeDB CLI commands are useful for working with this runtime. Basic operations like querying tables, calling reducers manually, and checking module status are essential for development.
 
 **What should be added:**
-- How to configure each channel type via the configure_channel reducer
-- Required fields per channel type (Telegram: bot token + API base; Discord: webhook URL; Slack: webhook URL)
-- Example reducer calls for setting up Telegram, Discord, and Slack
-- How to test that a channel is working
+- Essential SpacetimeDB CLI commands for development
+- How to call a reducer from the CLI
+- How to query a table from the CLI
+- How to check module status and connected clients
+- How to view logs
 
-**Which file:** technical.html (expand the existing Channel Architecture section)
+**Which file:** `index.html` (new section before the CTA row, after the quickstart)

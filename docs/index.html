@@ -165,6 +165,7 @@
   <a href="index.html" class="active">Overview</a>
   <a href="technical.html">Technical</a>
   <a href="implementation.html">Implementation</a>
+  <a href="business-plan.html">Business Plan</a>
 </nav>
 
 <section class="hero">
@@ -293,6 +294,65 @@
     </pre></div>
   </section>
 
+  <!-- ───── Status Codes & State Machines ───── -->
+  <section style="margin: 4rem 0;">
+    <div class="section-label">Reference</div>
+    <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Status Codes &amp; State Machines</h2>
+    <p style="color: var(--text-muted); margin-bottom: 1.5rem;">The system uses several status fields across tables. Here is a unified reference for every status value and its meaning.</p>
+
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; margin-bottom: 1.5rem;">
+      <h3 style="font-size: 1.05rem; color: #58a6ff; margin-bottom: 0.75rem;">ProcessResult.status</h3>
+      <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem;">Returned by <code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">process_message()</code> and <code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">continue_conversation()</code> to indicate what happened.</p>
+      <table style="width: 100%; border-collapse: collapse; background: none; border: none;">
+        <tr>
+          <th style="background: rgba(88,166,255,0.06); color: var(--accent); font-weight: 600; padding: 0.6rem 1rem; text-align: left; font-size: 0.88rem; border-bottom: 1px solid var(--border);">Status</th>
+          <th style="background: rgba(88,166,255,0.06); color: var(--accent); font-weight: 600; padding: 0.6rem 1rem; text-align: left; font-size: 0.88rem; border-bottom: 1px solid var(--border);">Meaning</th>
+          <th style="background: rgba(88,166,255,0.06); color: var(--accent); font-weight: 600; padding: 0.6rem 1rem; text-align: left; font-size: 0.88rem; border-bottom: 1px solid var(--border);">What To Do</th>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: 1px solid var(--border); color: #3fb950;">completed</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);">Agent finished reasoning. Final response is in the <code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">response</code> field.</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);">Display to user. No further action needed.</td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: 1px solid var(--border); color: #d29922;">awaiting_local_tools</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);">Agent needs local tool results (shell, file I/O). Requests have been written to <code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">local_tool_requests</code>.</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);">Worker picks up requests, executes them, calls <code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">submit_local_tool_result()</code>, then <code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">continue_conversation()</code>.</td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: 1px solid var(--border); color: #f85149;">error</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);">Something failed: agent not found, LLM API error, parse failure.</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);">Check the <code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">response</code> field for error details. Fix and retry.</td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: none; color: #bc8cff;">iteration_limit</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: none;">Agent hit <code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">max_tool_iterations</code> without producing a final response.</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: none;">Consider increasing the limit or simplifying the task.</td>
+        </tr>
+      </table>
+    </div>
+
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; margin-bottom: 1.5rem;">
+      <h3 style="font-size: 1.05rem; color: #58a6ff; margin-bottom: 0.75rem;">LocalToolRequest.status</h3>
+      <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem;">Tracks the lifecycle of a tool request dispatched to the worker.</p>
+      <div class="flow-diagram" style="margin: 0;"><pre>
+  <span class="c-orange">pending</span>  ──worker claims──▶  <span class="c-accent">processing</span>  ──execution──▶  <span class="c-green">completed</span>
+                                            │
+                                            └──on error──▶  <span class="c-purple">failed</span>
+      </pre></div>
+    </div>
+
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem;">
+      <h3 style="font-size: 1.05rem; color: #58a6ff; margin-bottom: 0.75rem;">PendingSend.status</h3>
+      <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 0.75rem;">Tracks outbound messages queued for non-HTTP channel delivery.</p>
+      <div class="flow-diagram" style="margin: 0;"><pre>
+  <span class="c-orange">pending</span>  ──worker delivers──▶  <span class="c-green">sent</span>
+                │
+                └──on error──▶  <span class="c-purple">failed</span>
+      </pre></div>
+    </div>
+  </section>
+
   <!-- ───── Design Principles ───── -->
   <div class="section-label" style="margin-top: 3rem;">Why this shape</div>
   <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Design Principles</h2>
@@ -352,6 +412,169 @@
         <td><code>spacetime publish zeroclaw</code></td>
       </tr>
     </table>
+  </section>
+
+  <!-- ───── Quickstart ───── -->
+  <section style="margin: 4rem 0;">
+    <div class="section-label">Get running</div>
+    <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Quickstart Guide</h2>
+    <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Go from zero to a working agent in five steps. This guide assumes a fresh machine.</p>
+
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; margin-bottom: 1.5rem;">
+      <h3 style="font-size: 1.05rem; color: #39d2c0; margin: 0 0 0.75rem;">Prerequisites</h3>
+      <table style="width: 100%; border-collapse: collapse; background: none; border: none;">
+        <tr>
+          <th style="background: rgba(88,166,255,0.06); color: var(--accent); font-weight: 600; padding: 0.6rem 1rem; text-align: left; font-size: 0.88rem; border-bottom: 1px solid var(--border);">Dependency</th>
+          <th style="background: rgba(88,166,255,0.06); color: var(--accent); font-weight: 600; padding: 0.6rem 1rem; text-align: left; font-size: 0.88rem; border-bottom: 1px solid var(--border);">Minimum Version</th>
+          <th style="background: rgba(88,166,255,0.06); color: var(--accent); font-weight: 600; padding: 0.6rem 1rem; text-align: left; font-size: 0.88rem; border-bottom: 1px solid var(--border);">Install</th>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: 1px solid var(--border);">Rust toolchain</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);">1.78+</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);"><code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh</code></td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: 1px solid var(--border);">SpacetimeDB CLI</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);">2.0+</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);"><code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">curl -sSf https://install.spacetimedb.com | sh</code></td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: 1px solid var(--border);">wasm32 target</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);">&mdash;</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);"><code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">rustup target add wasm32-unknown-unknown</code></td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: none;">LLM API key</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: none;">&mdash;</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: none;">An API key from Anthropic, OpenAI, or any OpenAI-compatible provider</td>
+        </tr>
+      </table>
+    </div>
+
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; margin-bottom: 1.5rem;">
+      <h3 style="font-size: 1.05rem; color: #39d2c0; margin: 0 0 0.75rem;">Step 1: Start SpacetimeDB locally</h3>
+      <div class="flow-diagram" style="margin: 0 0 0.75rem;"><pre>
+<span class="c-green">$</span> spacetime start
+<span class="c-purple">info:</span> Starting SpacetimeDB on 127.0.0.1:3000...
+<span class="c-purple">info:</span> SpacetimeDB is ready.
+      </pre></div>
+      <p style="font-size: 0.88rem; color: var(--text-muted);">This starts the local SpacetimeDB instance that will host the agent module.</p>
+    </div>
+
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; margin-bottom: 1.5rem;">
+      <h3 style="font-size: 1.05rem; color: #39d2c0; margin: 0 0 0.75rem;">Step 2: Publish the server module</h3>
+      <div class="flow-diagram" style="margin: 0 0 0.75rem;"><pre>
+<span class="c-green">$</span> cd spacetime/server
+<span class="c-green">$</span> spacetime publish zeroclaw
+<span class="c-purple">info:</span> Building module...
+<span class="c-purple">info:</span> Published module "zeroclaw"
+<span class="c-purple">info:</span> Module is running at ws://127.0.0.1:3000
+      </pre></div>
+      <p style="font-size: 0.88rem; color: var(--text-muted);">This compiles the server to WebAssembly and deploys it into SpacetimeDB. The <code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">init()</code> reducer runs automatically, creating the default agent and security policy.</p>
+    </div>
+
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; margin-bottom: 1.5rem;">
+      <h3 style="font-size: 1.05rem; color: #39d2c0; margin: 0 0 0.75rem;">Step 3: Set your LLM API key</h3>
+      <div class="flow-diagram" style="margin: 0 0 0.75rem;"><pre>
+<span class="c-green">$</span> spacetime call zeroclaw update_agent \
+    --arg 1 \
+    --arg '{"api_key": "<span class="c-orange">your-api-key-here</span>"}'
+      </pre></div>
+      <p style="font-size: 0.88rem; color: var(--text-muted);">The default agent (ID 1) starts with an empty API key. You must set it before the agent can call an LLM. Without this step, every message will return an error.</p>
+    </div>
+
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; margin-bottom: 1.5rem;">
+      <h3 style="font-size: 1.05rem; color: #39d2c0; margin: 0 0 0.75rem;">Step 4: Generate bindings and start the worker</h3>
+      <div class="flow-diagram" style="margin: 0 0 0.75rem;"><pre>
+<span class="c-green">$</span> cd spacetime/server
+<span class="c-green">$</span> spacetime generate --lang rust --out-dir ../worker/src/module_bindings --project-path .
+
+<span class="c-green">$</span> cd ../worker
+<span class="c-green">$</span> SPACETIME_URI=ws://localhost:3000 \
+  SPACETIME_MODULE=zeroclaw \
+  ZEROCLAW_AGENT_ID=1 \
+  cargo run
+
+<span class="c-purple">info:</span> Connected to zeroclaw at ws://localhost:3000
+<span class="c-purple">info:</span> Registered worker "my-hostname"
+<span class="c-purple">info:</span> Registered 3 local tools: shell, file_read, file_write
+<span class="c-accent">you&gt;</span> _
+      </pre></div>
+      <p style="font-size: 0.88rem; color: var(--text-muted);">The worker connects to SpacetimeDB, registers its local tools (shell, file_read, file_write), and enters CLI mode where you can chat with the agent.</p>
+    </div>
+
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem; margin-bottom: 1.5rem;">
+      <h3 style="font-size: 1.05rem; color: #39d2c0; margin: 0 0 0.75rem;">Step 5: Send a test message</h3>
+      <div class="flow-diagram" style="margin: 0 0 0.75rem;"><pre>
+<span class="c-accent">you&gt;</span> Hello, what can you do?
+
+<span class="c-green">agent&gt;</span> I'm ZeroClaw, an autonomous agent. I can:
+  - Search the web (web_search)
+  - Make HTTP requests (http_request)
+  - Store and recall memories (memory_store, memory_recall)
+  - Execute shell commands (shell)
+  - Read and write files (file_read, file_write)
+
+  How can I help you?
+      </pre></div>
+      <p style="font-size: 0.88rem; color: var(--text-muted);">If you see a response from the agent, the full system is working: SpacetimeDB received your message, called the LLM, and returned the result through the worker.</p>
+    </div>
+  </section>
+
+  <!-- ───── CLI Cheat Sheet ───── -->
+  <section style="margin: 4rem 0;">
+    <div class="section-label">Developer reference</div>
+    <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">SpacetimeDB CLI Cheat Sheet</h2>
+    <p style="color: var(--text-muted); margin-bottom: 1.5rem;">Essential commands for developing and debugging the ZeroClaw runtime. Run these from your terminal.</p>
+
+    <div style="background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.75rem;">
+      <table style="width: 100%; border-collapse: collapse; background: none; border: none;">
+        <tr>
+          <th style="background: rgba(88,166,255,0.06); color: var(--accent); font-weight: 600; padding: 0.6rem 1rem; text-align: left; font-size: 0.88rem; border-bottom: 1px solid var(--border);">Task</th>
+          <th style="background: rgba(88,166,255,0.06); color: var(--accent); font-weight: 600; padding: 0.6rem 1rem; text-align: left; font-size: 0.88rem; border-bottom: 1px solid var(--border);">Command</th>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: 1px solid var(--border);">Start SpacetimeDB</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);"><code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">spacetime start</code></td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: 1px solid var(--border);">Publish / update the module</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);"><code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">spacetime publish zeroclaw</code></td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: 1px solid var(--border);">Query a table (SQL)</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);"><code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">spacetime sql zeroclaw "SELECT * FROM agents"</code></td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: 1px solid var(--border);">Call a reducer</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);"><code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">spacetime call zeroclaw store_memory -- 1 "key" "value" "core" ""</code></td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: 1px solid var(--border);">View module logs</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);"><code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">spacetime logs zeroclaw</code></td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: 1px solid var(--border);">Follow logs in real time</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);"><code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">spacetime logs zeroclaw -f</code></td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: 1px solid var(--border);">Check pending tool requests</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);"><code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">spacetime sql zeroclaw "SELECT * FROM local_tool_requests WHERE status = 'pending'"</code></td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: 1px solid var(--border);">List connected workers</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);"><code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">spacetime sql zeroclaw "SELECT * FROM workers"</code></td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: 1px solid var(--border);">View recent messages</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: 1px solid var(--border);"><code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">spacetime sql zeroclaw "SELECT id, role, content FROM messages ORDER BY id DESC LIMIT 10"</code></td>
+        </tr>
+        <tr>
+          <td style="padding: 0.6rem 1rem; font-weight: 600; font-size: 0.88rem; border-bottom: none;">Generate SDK bindings</td>
+          <td style="padding: 0.6rem 1rem; font-size: 0.88rem; color: var(--text-muted); border-bottom: none;"><code style="font-size: 0.85em; background: var(--bg); padding: 0.15em 0.35em; border-radius: 4px;">spacetime generate --lang rust --out-dir ../worker/src/module_bindings --project-path .</code></td>
+        </tr>
+      </table>
+    </div>
   </section>
 
   <!-- ───── Navigation ───── -->
