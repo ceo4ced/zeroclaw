@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ZeroClaw SpacetimeDB — Business Plan v2</title>
+<title>SpaceClaw SpacetimeDB — Business Plan v2</title>
 <style>
   :root {
     --bg: #0d1117; --surface: #161b22; --border: #30363d;
@@ -159,7 +159,7 @@
 <body>
 
 <nav class="top-nav">
-  <span class="logo">ZeroClaw</span>
+  <span class="logo">SpaceClaw</span>
   <a href="index.html">Overview</a>
   <a href="technical.html">Technical</a>
   <a href="implementation.html">Implementation</a>
@@ -170,7 +170,7 @@
 
 <div class="page-header">
   <div class="section-label">Business Plan v2</div>
-  <h1>ZeroClaw: Agent Orchestration Platform</h1>
+  <h1>SpaceClaw: Agent Orchestration Platform</h1>
   <p>A managed platform for deploying, coordinating, and scaling multi-agent AI systems. We sell agent orchestration &mdash; not commodity hosting.</p>
   <div class="meta">Updated: February 2026 &nbsp;|&nbsp; Supersedes: v1 (March 2026 draft)</div>
 </div>
@@ -178,12 +178,12 @@
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>1. Executive Summary</h2>
 
-<p><strong>ZeroClaw</strong> is a managed agent orchestration platform built on SpacetimeDB. It enables developers and businesses to deploy multi-agent AI systems with real-time coordination, persistent memory, security policy enforcement, and tool execution &mdash; without managing infrastructure.</p>
+<p><strong>SpaceClaw</strong> is a managed agent orchestration platform built on SpacetimeDB. It enables developers and businesses to deploy multi-agent AI systems with real-time coordination, persistent memory, security policy enforcement, and tool execution &mdash; without managing infrastructure.</p>
 
-<p>Unlike generic cloud hosting, ZeroClaw provides <strong>purpose-built agent infrastructure</strong>: multi-agent state synchronization, conversation memory, security policy enforcement, and a tool execution sandbox. This is the value layer that justifies premium pricing over raw compute.</p>
+<p>Unlike generic cloud hosting, SpaceClaw provides <strong>purpose-built agent infrastructure</strong>: multi-agent state synchronization, conversation memory, security policy enforcement, and a tool execution sandbox. This is the value layer that justifies premium pricing over raw compute.</p>
 
 <h3>What Changed from v1</h3>
-<p>The original plan positioned ZeroClaw as infrastructure hosting at commodity prices ($5/user/month) with a single revenue stream (subscriptions). This revision repositions around value-based pricing with four revenue streams, an enterprise tier, and usage-based components that align revenue with actual customer value.</p>
+<p>The original plan positioned SpaceClaw as infrastructure hosting at commodity prices ($5/user/month) with a single revenue stream (subscriptions). This revision repositions around value-based pricing with four revenue streams, an enterprise tier, and usage-based components that align revenue with actual customer value.</p>
 
 <div class="kpi-grid">
   <div class="kpi"><div class="value">4</div><div class="label">Revenue Streams</div></div>
@@ -195,7 +195,7 @@
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>2. Core Insight: Sell Orchestration, Not Hosting</h2>
 
-<p>The v1 plan sold infrastructure at cost-plus margins. The problem: anyone can rent a VPS for less. The value of ZeroClaw is not "a server that runs agents" &mdash; it is:</p>
+<p>The v1 plan sold infrastructure at cost-plus margins. The problem: anyone can rent a VPS for less. The value of SpaceClaw is not "a server that runs agents" &mdash; it is:</p>
 
 <ul>
   <li><strong>Multi-agent coordination</strong> &mdash; real-time state sync between agents via SpacetimeDB subscriptions, something that requires custom engineering to build from scratch.</li>
@@ -209,7 +209,7 @@
 
 <div class="callout strategy">
   <div class="label">Positioning</div>
-  <strong>Analogy: Stripe vs. a payment gateway.</strong> Stripe doesn't compete on "cheapest way to process a credit card." They sell developer experience, fraud prevention, and business tooling. ZeroClaw should sell developer experience, agent coordination, and operational safety &mdash; not the cheapest way to run an LLM wrapper.
+  <strong>Analogy: Stripe vs. a payment gateway.</strong> Stripe doesn't compete on "cheapest way to process a credit card." They sell developer experience, fraud prevention, and business tooling. SpaceClaw should sell developer experience, agent coordination, and operational safety &mdash; not the cheapest way to run an LLM wrapper.
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -246,16 +246,16 @@
 
 <h3>Market Trends</h3>
 <ul>
-  <li>AI agent frameworks are proliferating (AutoGPT, LangChain, CrewAI, Mastra, ZeroClaw) &mdash; but <strong>managed hosting for multi-agent systems</strong> is an underserved layer.</li>
+  <li>AI agent frameworks are proliferating (AutoGPT, LangChain, CrewAI, Mastra, SpaceClaw) &mdash; but <strong>managed hosting for multi-agent systems</strong> is an underserved layer.</li>
   <li>Enterprises are moving from "single chatbot" to "multi-agent workflows" &mdash; creating demand for coordination infrastructure.</li>
   <li>SpacetimeDB's architecture (database + compute + real-time sync in one) is uniquely suited to agent state management. We are early to this combination.</li>
 </ul>
 
 <h3>Competitive Landscape</h3>
 <table>
-  <tr><th>Competitor</th><th>What They Sell</th><th>ZeroClaw Advantage</th></tr>
+  <tr><th>Competitor</th><th>What They Sell</th><th>SpaceClaw Advantage</th></tr>
   <tr>
-    <td>Self-hosted ZeroClaw</td>
+    <td>Self-hosted SpaceClaw</td>
     <td>Free but full DevOps burden</td>
     <td>Zero-ops: <code>spacetime publish</code> and done</td>
   </tr>
@@ -291,7 +291,7 @@
   Included base &rarr; metered overage at transparent per-unit rates.
 
 <span class="c-purple">Revenue Stream 3: Managed LLM Proxy (Optional)</span>
-  Convenience billing. Users can optionally route LLM calls through ZeroClaw.
+  Convenience billing. Users can optionally route LLM calls through SpaceClaw.
   Margin on pass-through + unified billing + rate limiting + cost controls.
   BYOK remains available for power users who prefer direct API access.
 
@@ -384,7 +384,7 @@
 <h3>Managed LLM Proxy Pricing (Optional)</h3>
 <p>Users who opt in to the managed proxy pay a transparent markup over base model costs. This provides unified billing, built-in cost controls, and rate limiting.</p>
 <table>
-  <tr><th>Model</th><th>Base Cost (per 1M tokens)</th><th>ZeroClaw Proxy Price</th><th>Margin</th></tr>
+  <tr><th>Model</th><th>Base Cost (per 1M tokens)</th><th>SpaceClaw Proxy Price</th><th>Margin</th></tr>
   <tr><td>Claude Sonnet 4</td><td>$3 in / $15 out</td><td>$3.60 in / $18 out</td><td>20%</td></tr>
   <tr><td>Claude Opus 4</td><td>$15 in / $75 out</td><td>$18 in / $90 out</td><td>20%</td></tr>
   <tr><td>GPT-4o</td><td>$5 in / $15 out</td><td>$6 in / $18 out</td><td>20%</td></tr>
@@ -395,7 +395,7 @@
 
 <div class="callout strategy">
   <div class="label">Pricing Philosophy</div>
-  <strong>Price anchoring on value saved, not cost incurred.</strong> A team building multi-agent coordination from scratch spends 2&ndash;4 engineer-months ($30K&ndash;$80K). ZeroClaw at $99/month delivers that capability for $1,188/year &mdash; a 25&ndash;65x cost advantage. This is the framing for sales conversations, not "we charge $0.05 per agent-hour."
+  <strong>Price anchoring on value saved, not cost incurred.</strong> A team building multi-agent coordination from scratch spends 2&ndash;4 engineer-months ($30K&ndash;$80K). SpaceClaw at $99/month delivers that capability for $1,188/year &mdash; a 25&ndash;65x cost advantage. This is the framing for sales conversations, not "we charge $0.05 per agent-hour."
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════ -->
@@ -406,7 +406,7 @@
 │                 │     │        <span class="c-accent">SpacetimeDB Cloud</span>                  │     │             │
 │   Users' Apps   │────▶│                                          │────▶│  <span class="c-purple">LLM APIs</span>   │
 │ (Web/Mobile/CLI)│     │  ┌────────────────────────────────────┐  │     │ (OpenAI,    │
-│                 │◀────│  │ <span class="c-cyan">ZeroClaw Agent Module</span>              │  │     │  Anthropic, │
+│                 │◀────│  │ <span class="c-cyan">SpaceClaw Agent Module</span>              │  │     │  Anthropic, │
 └─────────────────┘     │  │                                    │  │     │  etc.)      │
       WebSocket         │  │ <span class="c-green">Reducers</span> (state):                  │  │     └──────┬──────┘
       subscriptions     │  │   create_agent, store_memory,      │  │            │
@@ -442,7 +442,7 @@
 <p>The v2 architecture adds <code>usage_meters</code> and <code>billing_events</code> tables to SpacetimeDB. Every agent invocation, tool execution, and storage allocation is recorded atomically alongside the operation itself. This enables accurate usage-based billing without external metering services.</p>
 
 <h3>New: LLM Proxy Layer</h3>
-<p>For users who opt into the managed proxy, LLM calls route through a ZeroClaw proxy procedure that: (1) tracks token usage per agent, (2) enforces cost caps from the security policy, (3) provides unified billing. For BYOK users, calls go direct via <code>ctx.http</code> with the user's own key &mdash; same as v1.</p>
+<p>For users who opt into the managed proxy, LLM calls route through a SpaceClaw proxy procedure that: (1) tracks token usage per agent, (2) enforces cost caps from the security policy, (3) provides unified billing. For BYOK users, calls go direct via <code>ctx.http</code> with the user's own key &mdash; same as v1.</p>
 
 <h3>Technical Corrections Carried Forward from v1</h3>
 <ul>
@@ -531,7 +531,7 @@
 
 <h3>Phase 1: Private Beta (Week 1&ndash;3)</h3>
 <ul>
-  <li>Invite 20&ndash;30 users from ZeroClaw community and SpacetimeDB Discord.</li>
+  <li>Invite 20&ndash;30 users from SpaceClaw community and SpacetimeDB Discord.</li>
   <li>All users on free tier; focus on finding product-market fit signals.</li>
   <li>Track: activation rate (deploy first agent), retention (return in week 2), feature usage.</li>
   <li>Conduct 5&ndash;10 user interviews to validate pricing willingness.</li>
@@ -547,7 +547,7 @@
 
 <h3>Phase 3: Growth + Enterprise Pipeline (Month 2&ndash;6)</h3>
 <ul>
-  <li>Content marketing: case studies, "how we built X with ZeroClaw agents" posts.</li>
+  <li>Content marketing: case studies, "how we built X with SpaceClaw agents" posts.</li>
   <li>Enable managed LLM proxy for users who request unified billing.</li>
   <li>Begin enterprise outreach: target AI-native startups and dev teams at mid-size companies.</li>
   <li>Ship team features: shared agent workspaces, role-based access, audit logs.</li>
@@ -594,7 +594,7 @@
   </tr>
   <tr>
     <td>Open source competition</td><td>High</td><td>High</td>
-    <td>ZeroClaw itself is open source &mdash; the managed platform competes on convenience, not code. Maintain feature velocity on the hosted platform (team features, marketplace, enterprise). The "open core" moat is the multi-tenant orchestration layer.</td>
+    <td>SpaceClaw itself is open source &mdash; the managed platform competes on convenience, not code. Maintain feature velocity on the hosted platform (team features, marketplace, enterprise). The "open core" moat is the multi-tenant orchestration layer.</td>
   </tr>
   <tr>
     <td>Solo founder burnout</td><td>Medium</td><td>High</td>
@@ -609,7 +609,7 @@
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>11. Open Core Strategy</h2>
 
-<p>ZeroClaw's dual license (MIT + Apache 2.0) enables an open core model:</p>
+<p>SpaceClaw's dual license (MIT + Apache 2.0) enables an open core model:</p>
 
 <table>
   <tr><th>Layer</th><th>License</th><th>What's Included</th></tr>
@@ -667,7 +667,7 @@
 <!-- ═══════════════════════════════════════════════════════════════ -->
 <h2>14. Conclusion</h2>
 
-<p>ZeroClaw's competitive advantage is <strong>agent orchestration</strong> &mdash; multi-agent coordination, persistent memory, security policies, and tool execution &mdash; not generic cloud hosting. The v2 business plan aligns pricing with this value through four revenue streams, usage-based scaling, and an enterprise tier that captures high-value customers.</p>
+<p>SpaceClaw's competitive advantage is <strong>agent orchestration</strong> &mdash; multi-agent coordination, persistent memory, security policies, and tool execution &mdash; not generic cloud hosting. The v2 business plan aligns pricing with this value through four revenue streams, usage-based scaling, and an enterprise tier that captures high-value customers.</p>
 
 <p>The economics are compelling: 90%+ gross margins from SpacetimeDB's efficient pricing, combined with multiple revenue streams that grow as customers succeed. A solo founder can reach meaningful revenue ($10K+ MRR) within 10 months by focusing on self-serve growth first and enterprise sales second.</p>
 
@@ -690,7 +690,7 @@
 
 </div>
 
-<footer>ZeroClaw &mdash; Agent Orchestration Platform &mdash; Business Plan v2</footer>
+<footer>SpaceClaw &mdash; Agent Orchestration Platform &mdash; Business Plan v2</footer>
 
 </body>
 </html>
