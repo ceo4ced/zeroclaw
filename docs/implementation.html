@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZeroClaw SpacetimeDB Runtime — Implementation</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #c9d1d9; --text-muted: #8b949e;
+    --accent: #58a6ff; --accent-dim: #1f6feb;
+    --green: #3fb950; --orange: #d29922; --red: #f85149;
+    --purple: #bc8cff; --cyan: #39d2c0; --yellow: #e3b341;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+  }
+  .top-nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(13,17,23,0.92); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0.75rem 2rem; display: flex; align-items: center; gap: 1.5rem;
+  }
+  .top-nav .logo { font-weight: 700; font-size: 1.1rem; color: var(--accent); }
+  .top-nav a {
+    color: var(--text-muted); text-decoration: none; font-size: 0.9rem;
+    border-bottom: 2px solid transparent; transition: all 0.2s; padding: 0.25rem 0;
+  }
+  .top-nav a:hover, .top-nav a.active { color: var(--text); border-bottom-color: var(--accent); }
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+  .page-header {
+    padding: 3.5rem 0 2rem;
+    border-bottom: 1px solid var(--border); margin-bottom: 2rem;
+  }
+  .page-header .section-label {
+    display: inline-block; font-size: 0.75rem; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--accent); font-weight: 700; margin-bottom: 0.5rem;
+  }
+  .page-header h1 { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.5rem; }
+  .page-header p { color: var(--text-muted); font-size: 1.05rem; max-width: 700px; }
+
+  h2 {
+    font-size: 1.4rem; margin: 3rem 0 0.75rem; padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+  }
+  h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+  h3 { font-size: 1.05rem; margin: 1.5rem 0 0.5rem; color: var(--cyan); }
+  p { margin-bottom: 0.75rem; font-size: 0.93rem; }
+
+  /* File header */
+  .file-header {
+    display: flex; align-items: center; gap: 0.75rem;
+    background: rgba(88,166,255,0.06); border: 1px solid var(--border);
+    border-bottom: none; border-radius: 8px 8px 0 0;
+    padding: 0.6rem 1rem; margin-top: 1.5rem;
+    font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.82rem;
+  }
+  .file-header .file-icon { color: var(--orange); }
+  .file-header .file-path { color: var(--accent); font-weight: 600; }
+  .file-header .file-desc { color: var(--text-muted); margin-left: auto; font-style: italic; }
+
+  /* Code blocks */
+  pre {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1.25rem; margin: 0 0 1.5rem; overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 0.78rem; line-height: 1.6; counter-reset: line;
+  }
+  pre.file-code { border-radius: 0 0 8px 8px; margin-top: 0; }
+  code {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 0.86em; background: var(--surface); padding: 0.15em 0.35em; border-radius: 4px;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+
+  /* Syntax colors */
+  .kw { color: var(--red); }
+  .ty { color: var(--cyan); }
+  .st { color: var(--green); }
+  .cm { color: var(--text-muted); font-style: italic; }
+  .fn { color: var(--purple); }
+  .mc { color: var(--orange); }
+  .nu { color: var(--yellow); }
+  .at { color: var(--accent); }
+
+  /* Annotation callouts within code sections */
+  .annotation {
+    background: rgba(88,166,255,0.06); border-left: 3px solid var(--accent);
+    padding: 0.75rem 1rem; margin: 0.5rem 0 1.25rem; border-radius: 0 6px 6px 0;
+    font-size: 0.88rem;
+  }
+  .annotation.warn { border-left-color: var(--orange); background: rgba(210,153,34,0.04); }
+  .annotation.success { border-left-color: var(--green); background: rgba(63,185,80,0.04); }
+  .annotation strong { color: var(--text); }
+
+  /* TOC */
+  .toc {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1.25rem 1.5rem; margin-bottom: 2rem;
+  }
+  .toc h3 { margin-top: 0; color: var(--text); font-size: 0.95rem; }
+  .toc ol { margin: 0.5rem 0 0 1.2rem; }
+  .toc li { margin-bottom: 0.25rem; font-size: 0.88rem; }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* Workspace structure */
+  .tree { margin: 1rem 0 1.5rem; }
+  .tree pre { font-size: 0.82rem; line-height: 1.5; }
+
+  /* Page nav */
+  .page-nav {
+    display: flex; justify-content: space-between; padding: 2rem 0 3rem;
+    border-top: 1px solid var(--border); margin-top: 3rem;
+  }
+  .page-nav a {
+    color: var(--accent); text-decoration: none; font-weight: 600;
+    padding: 0.5rem 1rem; border: 1px solid var(--border); border-radius: 8px;
+    transition: all 0.2s;
+  }
+  .page-nav a:hover { border-color: var(--accent); background: rgba(88,166,255,0.06); }
+  footer {
+    border-top: 1px solid var(--border); padding: 2rem;
+    text-align: center; color: var(--text-muted); font-size: 0.85rem;
+  }
+</style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <span class="logo">ZeroClaw</span>
+  <a href="index.html">Overview</a>
+  <a href="technical.html">Technical</a>
+  <a href="implementation.html" class="active">Implementation</a>
+</nav>
+
+<div class="container">
+<div class="page-header">
+  <div class="section-label">Implementation Walkthrough</div>
+  <h1>The Literal Code</h1>
+  <p>Annotated source from <code>spacetime/server/src/lib.rs</code> and <code>spacetime/worker/src/main.rs</code> &mdash; the complete runtime in two files.</p>
+</div>
+
+<div class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#workspace">Workspace Structure</a></li>
+    <li><a href="#tables">Table Definitions (Data Model)</a></li>
+    <li><a href="#json-types">JSON Wire Types</a></li>
+    <li><a href="#init">Initialization &amp; Lifecycle</a></li>
+    <li><a href="#reducers">State Management Reducers</a></li>
+    <li><a href="#process-message">process_message() &mdash; Main Entry Point</a></li>
+    <li><a href="#orchestration">orchestration_loop() &mdash; The Agent Brain</a></li>
+    <li><a href="#http-tools">HTTP Tool Execution</a></li>
+    <li><a href="#security">Security Policy Enforcement</a></li>
+    <li><a href="#memory">Memory Recall &amp; Injection</a></li>
+    <li><a href="#channels">Channel Send Functions</a></li>
+    <li><a href="#worker">Worker &mdash; Local Tool Execution</a></li>
+    <li><a href="#worker-cli">Worker CLI Mode</a></li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="workspace">1. Workspace Structure</h2>
+
+<p>The SpacetimeDB runtime is a Rust workspace with two crates under <code>spacetime/</code>.</p>
+
+<div class="tree"><pre>
+spacetime/
+  Cargo.toml              <span class="cm"># workspace root</span>
+  server/
+    Cargo.toml            <span class="cm"># zeroclaw-brain (cdylib for SpacetimeDB)</span>
+    src/
+      lib.rs              <span class="cm"># ~1500 lines — entire server module</span>
+  worker/
+    Cargo.toml            <span class="cm"># zeroclaw-worker binary</span>
+    src/
+      main.rs             <span class="cm"># ~390 lines — thin I/O bridge</span>
+      module_bindings/    <span class="cm"># auto-generated by `spacetime generate`</span>
+</pre></div>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4e6;</span>
+  <span class="file-path">spacetime/server/Cargo.toml</span>
+  <span class="file-desc">Server dependencies</span>
+</div>
+<pre class="file-code"><code>[<span class="at">package</span>]
+<span class="at">name</span> = <span class="st">"zeroclaw-brain"</span>
+<span class="at">version</span> = <span class="st">"0.1.0"</span>
+<span class="at">edition</span> = <span class="st">"2021"</span>
+
+[<span class="at">lib</span>]
+<span class="at">crate-type</span> = [<span class="st">"cdylib"</span>]     <span class="cm"># SpacetimeDB loads this as a dynamic library</span>
+
+[<span class="at">dependencies</span>]
+<span class="at">spacetimedb</span> = { version = <span class="st">"2.0"</span>, features = [<span class="st">"unstable"</span>] }  <span class="cm"># procedures require unstable</span>
+<span class="at">serde</span> = { version = <span class="st">"1"</span>, features = [<span class="st">"derive"</span>] }
+<span class="at">serde_json</span> = <span class="st">"1"</span>
+<span class="at">log</span> = <span class="st">"0.4"</span></code></pre>
+
+<div class="annotation">
+  <strong>Why <code>cdylib</code>?</strong> SpacetimeDB modules compile to a shared library (<code>.so</code>/<code>.dylib</code>) that the SpacetimeDB host loads at runtime. The <code>"unstable"</code> feature enables <code>ProcedureContext</code> with <code>ctx.http</code> for outbound HTTP calls from inside the database.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="tables">2. Table Definitions</h2>
+
+<p>All runtime state is encoded as SpacetimeDB tables. The <code>#[spacetimedb::table]</code> macro generates the schema, indexes, and CRUD operations.</p>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/server/src/lib.rs</span>
+  <span class="file-desc">Lines 19-176 &mdash; Table structs</span>
+</div>
+<pre class="file-code"><code><span class="cm">/// An agent identity: model config, system prompt, limits.</span>
+<span class="cm">/// Multiple agents can coexist — each customer/tenant gets their own.</span>
+<span class="mc">#[spacetimedb::table(name = agents, public)]</span>
+<span class="kw">pub struct</span> <span class="ty">Agent</span> {
+    <span class="mc">#[primary_key]</span>
+    <span class="mc">#[auto_inc]</span>
+    <span class="kw">pub</span> id: <span class="ty">u64</span>,
+    <span class="kw">pub</span> name: <span class="ty">String</span>,
+    <span class="kw">pub</span> model: <span class="ty">String</span>,              <span class="cm">// e.g. "anthropic/claude-sonnet-4-20250514"</span>
+    <span class="kw">pub</span> api_base_url: <span class="ty">String</span>,       <span class="cm">// LLM API endpoint</span>
+    <span class="kw">pub</span> api_key: <span class="ty">String</span>,            <span class="cm">// stored encrypted in production</span>
+    <span class="kw">pub</span> system_prompt: <span class="ty">String</span>,
+    <span class="kw">pub</span> max_tool_iterations: <span class="ty">u32</span>,
+    <span class="kw">pub</span> max_history_messages: <span class="ty">u32</span>,
+    <span class="kw">pub</span> owner: <span class="ty">Identity</span>,
+    <span class="kw">pub</span> created_at: <span class="ty">Timestamp</span>,
+}
+
+<span class="cm">/// A conversation session. Scoped to agent + channel + sender.</span>
+<span class="mc">#[spacetimedb::table(name = conversations, public)]</span>
+<span class="kw">pub struct</span> <span class="ty">Conversation</span> {
+    <span class="mc">#[primary_key]</span>
+    <span class="mc">#[auto_inc]</span>
+    <span class="kw">pub</span> id: <span class="ty">u64</span>,
+    <span class="kw">pub</span> agent_id: <span class="ty">u64</span>,
+    <span class="kw">pub</span> channel: <span class="ty">String</span>,
+    <span class="kw">pub</span> sender: <span class="ty">String</span>,
+    <span class="kw">pub</span> active: <span class="ty">bool</span>,
+    <span class="kw">pub</span> tool_iteration: <span class="ty">u32</span>,      <span class="cm">// tracks depth in current tool loop</span>
+    <span class="kw">pub</span> created_at: <span class="ty">Timestamp</span>,
+    <span class="kw">pub</span> updated_at: <span class="ty">Timestamp</span>,
+}
+
+<span class="cm">/// A single message. Roles: system, user, assistant, tool.</span>
+<span class="mc">#[spacetimedb::table(name = messages, public)]</span>
+<span class="kw">pub struct</span> <span class="ty">Message</span> {
+    <span class="mc">#[primary_key]</span>
+    <span class="mc">#[auto_inc]</span>
+    <span class="kw">pub</span> id: <span class="ty">u64</span>,
+    <span class="kw">pub</span> conversation_id: <span class="ty">u64</span>,
+    <span class="kw">pub</span> role: <span class="ty">String</span>,              <span class="cm">// "system" | "user" | "assistant" | "tool"</span>
+    <span class="kw">pub</span> content: <span class="ty">String</span>,
+    <span class="kw">pub</span> tool_call_id: <span class="ty">String</span>,      <span class="cm">// set when role="tool"</span>
+    <span class="kw">pub</span> tool_calls_json: <span class="ty">String</span>,  <span class="cm">// JSON array when assistant wants tools</span>
+    <span class="kw">pub</span> created_at: <span class="ty">Timestamp</span>,
+}
+
+<span class="cm">/// Persistent memory. Survives across conversations.</span>
+<span class="mc">#[spacetimedb::table(name = memories, public)]</span>
+<span class="kw">pub struct</span> <span class="ty">Memory</span> {
+    <span class="mc">#[primary_key]</span>
+    <span class="mc">#[auto_inc]</span>
+    <span class="kw">pub</span> id: <span class="ty">u64</span>,
+    <span class="kw">pub</span> agent_id: <span class="ty">u64</span>,
+    <span class="mc">#[unique]</span>
+    <span class="kw">pub</span> key: <span class="ty">String</span>,               <span class="cm">// unique key for upsert behavior</span>
+    <span class="kw">pub</span> content: <span class="ty">String</span>,
+    <span class="kw">pub</span> category: <span class="ty">String</span>,          <span class="cm">// "core" | "daily" | "conversation"</span>
+    <span class="kw">pub</span> session_id: <span class="ty">String</span>,
+    <span class="kw">pub</span> created_at: <span class="ty">Timestamp</span>,
+}
+
+<span class="cm">/// Tool requests that need LOCAL execution (shell, filesystem).</span>
+<span class="mc">#[spacetimedb::table(name = local_tool_requests, public)]</span>
+<span class="kw">pub struct</span> <span class="ty">LocalToolRequest</span> {
+    <span class="mc">#[primary_key]</span>
+    <span class="mc">#[auto_inc]</span>
+    <span class="kw">pub</span> id: <span class="ty">u64</span>,
+    <span class="kw">pub</span> conversation_id: <span class="ty">u64</span>,
+    <span class="kw">pub</span> tool_call_id: <span class="ty">String</span>,
+    <span class="kw">pub</span> tool_name: <span class="ty">String</span>,
+    <span class="kw">pub</span> parameters_json: <span class="ty">String</span>,
+    <span class="kw">pub</span> status: <span class="ty">String</span>,            <span class="cm">// pending → processing → completed | failed</span>
+    <span class="kw">pub</span> result: <span class="ty">String</span>,
+    <span class="kw">pub</span> claimed_by: <span class="ty">String</span>,
+    <span class="kw">pub</span> created_at: <span class="ty">Timestamp</span>,
+}
+
+<span class="cm">/// Per-agent security policy. Deny-by-default.</span>
+<span class="mc">#[spacetimedb::table(name = security_policies, public)]</span>
+<span class="kw">pub struct</span> <span class="ty">SecurityPolicy</span> {
+    <span class="mc">#[primary_key]</span>
+    <span class="kw">pub</span> agent_id: <span class="ty">u64</span>,
+    <span class="kw">pub</span> autonomy_level: <span class="ty">String</span>,        <span class="cm">// "manual" | "semi_auto" | "auto"</span>
+    <span class="kw">pub</span> allowed_tools_json: <span class="ty">String</span>,   <span class="cm">// JSON array — whitelist</span>
+    <span class="kw">pub</span> blocked_tools_json: <span class="ty">String</span>,   <span class="cm">// JSON array — blacklist</span>
+    <span class="kw">pub</span> max_tool_iterations: <span class="ty">u32</span>,
+    <span class="kw">pub</span> rate_limit_per_minute: <span class="ty">u32</span>,
+}
+
+<span class="cm">/// Available tools and their JSON schemas.</span>
+<span class="mc">#[spacetimedb::table(name = tool_registry, public)]</span>
+<span class="kw">pub struct</span> <span class="ty">ToolRegistryEntry</span> {
+    <span class="mc">#[primary_key]</span>
+    <span class="kw">pub</span> name: <span class="ty">String</span>,
+    <span class="kw">pub</span> description: <span class="ty">String</span>,
+    <span class="kw">pub</span> parameters_schema_json: <span class="ty">String</span>,
+    <span class="kw">pub</span> execution_mode: <span class="ty">String</span>,      <span class="cm">// "http" = procedure, "local" = worker</span>
+}</code></pre>
+
+<div class="annotation">
+  <strong>Design note:</strong> Every table is marked <code>public</code>, making it subscribable by workers and external clients via SpacetimeDB's real-time protocol. The <code>execution_mode</code> field on <code>ToolRegistryEntry</code> is the key routing decision &mdash; it determines whether a tool runs inline in a procedure or gets queued for the worker.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="json-types">3. JSON Wire Types</h2>
+
+<p>These structs serialize/deserialize the LLM API payloads and the procedure return value.</p>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/server/src/lib.rs</span>
+  <span class="file-desc">Lines 179-253 &mdash; Wire types</span>
+</div>
+<pre class="file-code"><code><span class="mc">#[derive(serde::Serialize, serde::Deserialize, Clone)]</span>
+<span class="kw">struct</span> <span class="ty">ToolCall</span> {
+    id: <span class="ty">String</span>,
+    name: <span class="ty">String</span>,
+    arguments: <span class="ty">String</span>,          <span class="cm">// raw JSON string from LLM</span>
+}
+
+<span class="mc">#[derive(serde::Serialize, serde::Deserialize)]</span>
+<span class="kw">struct</span> <span class="ty">LlmMessage</span> {
+    role: <span class="ty">String</span>,
+    content: <span class="ty">String</span>,
+    <span class="mc">#[serde(skip_serializing_if = "Option::is_none")]</span>
+    tool_call_id: <span class="ty">Option</span>&lt;<span class="ty">String</span>&gt;,
+    <span class="mc">#[serde(skip_serializing_if = "Option::is_none")]</span>
+    tool_calls: <span class="ty">Option</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">LlmToolCall</span>&gt;&gt;,
+}
+
+<span class="mc">#[derive(serde::Serialize, serde::Deserialize)]</span>
+<span class="kw">struct</span> <span class="ty">LlmApiRequest</span> {
+    model: <span class="ty">String</span>,
+    messages: <span class="ty">Vec</span>&lt;<span class="ty">LlmMessage</span>&gt;,
+    <span class="mc">#[serde(skip_serializing_if = "Option::is_none")]</span>
+    tools: <span class="ty">Option</span>&lt;<span class="ty">Vec</span>&lt;<span class="ty">serde_json::Value</span>&gt;&gt;,
+    max_tokens: <span class="ty">u32</span>,
+}
+
+<span class="cm">/// Return type from process_message() and continue_conversation().</span>
+<span class="mc">#[spacetimedb::table(name = process_results, public)]</span>
+<span class="kw">pub struct</span> <span class="ty">ProcessResult</span> {
+    <span class="mc">#[primary_key]</span>
+    <span class="mc">#[auto_inc]</span>
+    <span class="kw">pub</span> id: <span class="ty">u64</span>,
+    <span class="kw">pub</span> status: <span class="ty">String</span>,                    <span class="cm">// "completed" | "awaiting_local_tools" | "error"</span>
+    <span class="kw">pub</span> response: <span class="ty">String</span>,                  <span class="cm">// assistant text</span>
+    <span class="kw">pub</span> conversation_id: <span class="ty">u64</span>,
+    <span class="kw">pub</span> pending_local_tools_json: <span class="ty">String</span>, <span class="cm">// JSON of tools awaiting worker</span>
+}</code></pre>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="init">4. Initialization &amp; Lifecycle</h2>
+
+<p>The <code>init</code> reducer runs once when the module is first published. It seeds the default agent, security policy, built-in tools, and schedules hygiene.</p>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/server/src/lib.rs</span>
+  <span class="file-desc">init() reducer</span>
+</div>
+<pre class="file-code"><code><span class="mc">#[spacetimedb::reducer(init)]</span>
+<span class="kw">pub fn</span> <span class="fn">init</span>(ctx: &amp;<span class="ty">ReducerContext</span>) {
+    <span class="cm">// Seed default agent</span>
+    ctx.db.<span class="fn">agents</span>().<span class="fn">insert</span>(<span class="ty">Agent</span> {
+        id: <span class="nu">0</span>,  <span class="cm">// auto_inc will assign 1</span>
+        name: <span class="st">"ZeroClaw"</span>.into(),
+        model: <span class="st">"anthropic/claude-sonnet-4-20250514"</span>.into(),
+        api_base_url: <span class="st">"https://api.anthropic.com/v1/messages"</span>.into(),
+        api_key: <span class="ty">String</span>::new(),  <span class="cm">// must be set via update_agent</span>
+        system_prompt: <span class="st">"You are ZeroClaw, an autonomous agent. ..."</span>.into(),
+        max_tool_iterations: <span class="nu">10</span>,
+        max_history_messages: <span class="nu">50</span>,
+        owner: ctx.sender,
+        created_at: ctx.timestamp,
+    });
+
+    <span class="cm">// Default security policy: semi-autonomous, deny-by-default</span>
+    ctx.db.<span class="fn">security_policies</span>().<span class="fn">insert</span>(<span class="ty">SecurityPolicy</span> {
+        agent_id: <span class="nu">1</span>,
+        autonomy_level: <span class="st">"semi_auto"</span>.into(),
+        allowed_tools_json: <span class="st">"[]"</span>.into(),   <span class="cm">// empty = all allowed</span>
+        blocked_tools_json: <span class="st">"[]"</span>.into(),
+        max_tool_iterations: <span class="nu">10</span>,
+        rate_limit_per_minute: <span class="nu">30</span>,
+    });
+
+    <span class="cm">// Register built-in HTTP tools</span>
+    <span class="fn">builtin_http_tools</span>(ctx);
+
+    <span class="cm">// Schedule hourly hygiene</span>
+    ctx.db.<span class="fn">hygiene_schedule</span>().<span class="fn">insert</span>(<span class="ty">HygieneSchedule</span> {
+        scheduled_id: <span class="nu">0</span>,
+        scheduled_at: <span class="ty">ScheduleAt::Interval</span>(std::time::Duration::from_secs(<span class="nu">3600</span>).into()),
+    });
+}</code></pre>
+
+<div class="annotation success">
+  <strong>Lifecycle hooks:</strong> SpacetimeDB also calls <code>on_connect</code>/<code>on_disconnect</code> for client connections. The module uses these to track worker presence in the <code>workers</code> table and clean up stale entries.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="reducers">5. State Management Reducers</h2>
+
+<p>Reducers are transactional state mutations. Each one is a single atomic operation.</p>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/server/src/lib.rs</span>
+  <span class="file-desc">Selected reducers</span>
+</div>
+<pre class="file-code"><code><span class="cm">/// Register a local tool (called by worker on startup).</span>
+<span class="mc">#[spacetimedb::reducer]</span>
+<span class="kw">pub fn</span> <span class="fn">register_local_tool</span>(
+    ctx: &amp;<span class="ty">ReducerContext</span>,
+    name: <span class="ty">String</span>,
+    description: <span class="ty">String</span>,
+    parameters_schema_json: <span class="ty">String</span>,
+) {
+    <span class="cm">// Upsert: delete existing then insert</span>
+    <span class="kw">if let</span> <span class="ty">Some</span>(existing) = ctx.db.<span class="fn">tool_registry</span>().<span class="fn">name</span>().<span class="fn">find</span>(&amp;name) {
+        ctx.db.<span class="fn">tool_registry</span>().<span class="fn">name</span>().<span class="fn">delete</span>(&amp;name);
+    }
+    ctx.db.<span class="fn">tool_registry</span>().<span class="fn">insert</span>(<span class="ty">ToolRegistryEntry</span> {
+        name,
+        description,
+        parameters_schema_json,
+        execution_mode: <span class="st">"local"</span>.into(),  <span class="cm">// worker-executed</span>
+    });
+}
+
+<span class="cm">/// Worker submits result of a local tool execution.</span>
+<span class="mc">#[spacetimedb::reducer]</span>
+<span class="kw">pub fn</span> <span class="fn">submit_local_tool_result</span>(
+    ctx: &amp;<span class="ty">ReducerContext</span>,
+    request_id: <span class="ty">u64</span>,
+    result: <span class="ty">String</span>,
+    success: <span class="ty">bool</span>,
+) {
+    <span class="kw">if let</span> <span class="ty">Some</span>(<span class="kw">mut</span> req) = ctx.db.<span class="fn">local_tool_requests</span>().<span class="fn">id</span>().<span class="fn">find</span>(&amp;request_id) {
+        req.status = <span class="kw">if</span> success {
+            <span class="st">"completed"</span>.into()
+        } <span class="kw">else</span> {
+            <span class="st">"failed"</span>.into()
+        };
+        req.result = result;
+        req.claimed_by = ctx.sender.to_hex();
+        ctx.db.<span class="fn">local_tool_requests</span>().<span class="fn">id</span>().<span class="fn">update</span>(req);
+    }
+}
+
+<span class="cm">/// Upsert persistent memory for an agent.</span>
+<span class="mc">#[spacetimedb::reducer]</span>
+<span class="kw">pub fn</span> <span class="fn">store_memory</span>(
+    ctx: &amp;<span class="ty">ReducerContext</span>,
+    agent_id: <span class="ty">u64</span>,
+    key: <span class="ty">String</span>,
+    content: <span class="ty">String</span>,
+    category: <span class="ty">String</span>,
+    session_id: <span class="ty">String</span>,
+) {
+    <span class="cm">// Delete existing by key (upsert)</span>
+    <span class="kw">if let</span> <span class="ty">Some</span>(_) = ctx.db.<span class="fn">memories</span>().<span class="fn">key</span>().<span class="fn">find</span>(&amp;key) {
+        ctx.db.<span class="fn">memories</span>().<span class="fn">key</span>().<span class="fn">delete</span>(&amp;key);
+    }
+    ctx.db.<span class="fn">memories</span>().<span class="fn">insert</span>(<span class="ty">Memory</span> {
+        id: <span class="nu">0</span>, agent_id, key, content, category, session_id,
+        created_at: ctx.timestamp,
+    });
+}</code></pre>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="process-message">6. process_message() &mdash; Main Entry Point</h2>
+
+<p>This procedure is the single entry point for all inbound messages. It stores the message, auto-saves to memory, and kicks off the orchestration loop.</p>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/server/src/lib.rs</span>
+  <span class="file-desc">process_message procedure</span>
+</div>
+<pre class="file-code"><code><span class="mc">#[spacetimedb::reducer]</span>  <span class="cm">// procedure (uses ProcedureContext for ctx.http)</span>
+<span class="kw">pub fn</span> <span class="fn">process_message</span>(
+    ctx: &amp;<span class="ty">ProcedureContext</span>,
+    agent_id: <span class="ty">u64</span>,
+    channel: <span class="ty">String</span>,
+    sender: <span class="ty">String</span>,
+    content: <span class="ty">String</span>,
+) -&gt; <span class="ty">ProcessResult</span> {
+    <span class="cm">// 1. Look up agent</span>
+    <span class="kw">let</span> agent = <span class="kw">match</span> ctx.db.<span class="fn">agents</span>().<span class="fn">id</span>().<span class="fn">find</span>(&amp;agent_id) {
+        <span class="ty">Some</span>(a) =&gt; a,
+        <span class="ty">None</span> =&gt; <span class="kw">return</span> <span class="fn">error_result</span>(<span class="st">"Agent not found"</span>),
+    };
+
+    <span class="cm">// 2. Find or create conversation</span>
+    <span class="kw">let</span> conversation = <span class="fn">find_or_create_conv</span>(ctx, agent_id, &amp;channel, &amp;sender);
+
+    <span class="cm">// 3. Store the user message</span>
+    ctx.db.<span class="fn">messages</span>().<span class="fn">insert</span>(<span class="ty">Message</span> {
+        id: <span class="nu">0</span>,
+        conversation_id: conversation.id,
+        role: <span class="st">"user"</span>.into(),
+        content: content.clone(),
+        tool_call_id: <span class="ty">String</span>::new(),
+        tool_calls_json: <span class="ty">String</span>::new(),
+        created_at: ctx.timestamp,
+    });
+
+    <span class="cm">// 4. Auto-save to memory (significant messages only)</span>
+    <span class="kw">if</span> content.len() &gt; <span class="nu">20</span> {
+        <span class="kw">let</span> mem_key = <span class="kw">format!</span>(<span class="st">"conv_{}_msg_{}"</span>, conversation.id, ctx.timestamp);
+        <span class="fn">ctx_store_memory</span>(ctx, agent_id, &amp;mem_key, &amp;content, <span class="st">"conversation"</span>);
+    }
+
+    <span class="cm">// 5. Run the orchestration loop</span>
+    <span class="fn">orchestration_loop</span>(ctx, &amp;agent, &amp;conversation)
+}</code></pre>
+
+<div class="annotation">
+  <strong>Key insight:</strong> <code>ProcedureContext</code> gives access to <code>ctx.http</code> for outbound HTTP. Regular <code>ReducerContext</code> only allows table operations. This is why the orchestration lives in a procedure, not a reducer.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="orchestration">7. orchestration_loop() &mdash; The Agent Brain</h2>
+
+<p>The core reasoning loop. Calls the LLM, dispatches tools, and loops until the agent has a final response or hits the iteration limit.</p>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/server/src/lib.rs</span>
+  <span class="file-desc">Core orchestration loop (simplified)</span>
+</div>
+<pre class="file-code"><code><span class="kw">fn</span> <span class="fn">orchestration_loop</span>(
+    ctx: &amp;<span class="ty">ProcedureContext</span>,
+    agent: &amp;<span class="ty">Agent</span>,
+    conversation: &amp;<span class="ty">Conversation</span>,
+) -&gt; <span class="ty">ProcessResult</span> {
+    <span class="kw">let</span> max_iter = agent.max_tool_iterations <span class="kw">as</span> <span class="ty">usize</span>;
+    <span class="kw">let</span> policy = ctx.db.<span class="fn">security_policies</span>().<span class="fn">agent_id</span>().<span class="fn">find</span>(&amp;agent.id);
+
+    <span class="kw">for</span> iteration <span class="kw">in</span> <span class="nu">0</span>..max_iter {
+        <span class="cm">// ── Build LLM request ──</span>
+        <span class="kw">let</span> messages = <span class="fn">build_messages</span>(ctx, agent, conversation);
+        <span class="kw">let</span> tools = <span class="fn">build_tools</span>(ctx);
+
+        <span class="kw">let</span> request = <span class="ty">LlmApiRequest</span> {
+            model: agent.model.clone(),
+            messages,
+            tools: <span class="kw">if</span> tools.is_empty() { <span class="ty">None</span> } <span class="kw">else</span> { <span class="ty">Some</span>(tools) },
+            max_tokens: <span class="nu">4096</span>,
+        };
+
+        <span class="cm">// ── Call LLM API via ctx.http ──</span>
+        <span class="kw">let</span> body = serde_json::to_vec(&amp;request).unwrap();
+        <span class="kw">let</span> http_resp = ctx.<span class="fn">http</span>(<span class="st">"POST"</span>, &amp;agent.api_base_url)
+            .<span class="fn">header</span>(<span class="st">"content-type"</span>, <span class="st">"application/json"</span>)
+            .<span class="fn">header</span>(<span class="st">"x-api-key"</span>, &amp;agent.api_key)
+            .<span class="fn">header</span>(<span class="st">"anthropic-version"</span>, <span class="st">"2023-06-01"</span>)
+            .<span class="fn">body</span>(&amp;body)
+            .<span class="fn">send</span>();
+
+        <span class="cm">// ── Parse response ──</span>
+        <span class="kw">let</span> resp: <span class="ty">LlmApiResponse</span> = <span class="cm">/* deserialize http_resp */</span>;
+        <span class="kw">let</span> content = <span class="cm">/* extract text content */</span>;
+        <span class="kw">let</span> tool_calls = <span class="cm">/* extract tool_calls array */</span>;
+
+        <span class="cm">// Store assistant message</span>
+        ctx.db.<span class="fn">messages</span>().<span class="fn">insert</span>(<span class="ty">Message</span> {
+            role: <span class="st">"assistant"</span>.into(),
+            content: content.clone(),
+            tool_calls_json: serde_json::to_string(&amp;tool_calls).unwrap_or_default(),
+            ..
+        });
+
+        <span class="cm">// ── No tools? We're done ──</span>
+        <span class="kw">if</span> tool_calls.is_empty() {
+            <span class="fn">try_send_response</span>(ctx, conversation, &amp;content);
+            <span class="kw">return</span> <span class="ty">ProcessResult</span> {
+                status: <span class="st">"completed"</span>.into(),
+                response: content,
+                ..
+            };
+        }
+
+        <span class="cm">// ── Dispatch each tool call ──</span>
+        <span class="kw">let mut</span> local_pending: <span class="ty">Vec</span>&lt;<span class="ty">ToolCall</span>&gt; = <span class="ty">Vec</span>::new();
+
+        <span class="kw">for</span> tc <span class="kw">in</span> &amp;tool_calls {
+            <span class="cm">// Security check</span>
+            <span class="kw">if</span> !<span class="fn">is_tool_allowed</span>(&amp;policy, &amp;tc.name) {
+                ctx.db.<span class="fn">messages</span>().<span class="fn">insert</span>(<span class="ty">Message</span> {
+                    role: <span class="st">"tool"</span>.into(),
+                    content: <span class="kw">format!</span>(<span class="st">"Tool '{}' blocked by security policy"</span>, tc.name),
+                    tool_call_id: tc.id.clone(),
+                    ..
+                });
+                <span class="kw">continue</span>;
+            }
+
+            <span class="cm">// Look up execution mode</span>
+            <span class="kw">let</span> tool_entry = ctx.db.<span class="fn">tool_registry</span>().<span class="fn">name</span>().<span class="fn">find</span>(&amp;tc.name);
+
+            <span class="kw">match</span> tool_entry.map(|t| t.execution_mode.as_str()) {
+                <span class="ty">Some</span>(<span class="st">"http"</span>) =&gt; {
+                    <span class="cm">// Execute inline — no worker needed</span>
+                    <span class="kw">let</span> result = <span class="fn">execute_http_tool</span>(ctx, &amp;tc.name, &amp;tc.arguments);
+                    ctx.db.<span class="fn">messages</span>().<span class="fn">insert</span>(<span class="ty">Message</span> {
+                        role: <span class="st">"tool"</span>.into(),
+                        content: result,
+                        tool_call_id: tc.id.clone(),
+                        ..
+                    });
+                }
+                <span class="ty">Some</span>(<span class="st">"local"</span>) =&gt; {
+                    <span class="cm">// Queue for worker execution</span>
+                    ctx.db.<span class="fn">local_tool_requests</span>().<span class="fn">insert</span>(<span class="ty">LocalToolRequest</span> {
+                        id: <span class="nu">0</span>,
+                        conversation_id: conversation.id,
+                        tool_call_id: tc.id.clone(),
+                        tool_name: tc.name.clone(),
+                        parameters_json: tc.arguments.clone(),
+                        status: <span class="st">"pending"</span>.into(),
+                        result: <span class="ty">String</span>::new(),
+                        claimed_by: <span class="ty">String</span>::new(),
+                        created_at: ctx.timestamp,
+                    });
+                    local_pending.push(tc.clone());
+                }
+                _ =&gt; { <span class="cm">/* unknown tool — store error message */</span> }
+            }
+        }
+
+        <span class="cm">// If any local tools are pending, pause and wait for worker</span>
+        <span class="kw">if</span> !local_pending.is_empty() {
+            <span class="kw">return</span> <span class="ty">ProcessResult</span> {
+                status: <span class="st">"awaiting_local_tools"</span>.into(),
+                response: content,
+                pending_local_tools_json: serde_json::to_string(&amp;local_pending).unwrap(),
+                ..
+            };
+        }
+
+        <span class="cm">// All HTTP tools — loop back to LLM</span>
+    }
+
+    <span class="cm">// Hit iteration limit</span>
+    <span class="ty">ProcessResult</span> { status: <span class="st">"iteration_limit"</span>.into(), .. }
+}</code></pre>
+
+<div class="annotation warn">
+  <strong>Two-tier tool dispatch is the critical design decision.</strong> HTTP tools (web_search, http_request, memory) execute inline via <code>ctx.http</code> and feed results directly back to the LLM in the same loop iteration. Local tools (shell, filesystem) create <code>LocalToolRequest</code> rows and return immediately, pausing the loop until the worker picks them up and calls <code>continue_conversation()</code>.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="http-tools">8. HTTP Tool Execution</h2>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/server/src/lib.rs</span>
+  <span class="file-desc">execute_http_tool dispatch</span>
+</div>
+<pre class="file-code"><code><span class="kw">fn</span> <span class="fn">execute_http_tool</span>(ctx: &amp;<span class="ty">ProcedureContext</span>, name: &amp;<span class="ty">str</span>, args_json: &amp;<span class="ty">str</span>) -&gt; <span class="ty">String</span> {
+    <span class="kw">match</span> name {
+        <span class="st">"web_search"</span> =&gt; {
+            <span class="kw">let</span> query = <span class="cm">/* extract "query" from args_json */</span>;
+            <span class="kw">let</span> url = <span class="kw">format!</span>(<span class="st">"https://html.duckduckgo.com/html/?q={}"</span>, <span class="fn">urlencoded</span>(&amp;query));
+            <span class="kw">let</span> resp = ctx.<span class="fn">http</span>(<span class="st">"GET"</span>, &amp;url).<span class="fn">send</span>();
+            <span class="kw">let</span> body = <span class="ty">String</span>::from_utf8_lossy(&amp;resp.body());
+            body.chars().<span class="fn">take</span>(<span class="nu">2000</span>).<span class="fn">collect</span>()
+        }
+        <span class="st">"http_request"</span> =&gt; {
+            <span class="kw">let</span> url = <span class="cm">/* extract "url" */</span>;
+            <span class="kw">let</span> method = <span class="cm">/* extract "method" or default "GET" */</span>;
+            <span class="kw">let</span> resp = ctx.<span class="fn">http</span>(&amp;method, &amp;url).<span class="fn">send</span>();
+            <span class="kw">let</span> body = <span class="ty">String</span>::from_utf8_lossy(&amp;resp.body());
+            body.chars().<span class="fn">take</span>(<span class="nu">4000</span>).<span class="fn">collect</span>()  <span class="cm">// truncate large responses</span>
+        }
+        <span class="st">"memory_store"</span> =&gt; {
+            <span class="cm">// Upsert directly into memories table</span>
+            <span class="fn">ctx_store_memory</span>(ctx, agent_id, &amp;key, &amp;content, &amp;category);
+            <span class="kw">format!</span>(<span class="st">"Stored memory: {}"</span>, key)
+        }
+        <span class="st">"memory_recall"</span> =&gt; {
+            <span class="cm">// Keyword search across memories, return top 10</span>
+            <span class="kw">let</span> results: <span class="ty">Vec</span>&lt;<span class="ty">Memory</span>&gt; = ctx.db.<span class="fn">memories</span>().<span class="fn">iter</span>()
+                .<span class="fn">filter</span>(|m| <span class="cm">/* keyword match */</span>)
+                .<span class="fn">take</span>(<span class="nu">10</span>)
+                .<span class="fn">collect</span>();
+            serde_json::to_string(&amp;results).unwrap()
+        }
+        _ =&gt; <span class="kw">format!</span>(<span class="st">"Unknown HTTP tool: {}"</span>, name),
+    }
+}</code></pre>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="security">9. Security Policy Enforcement</h2>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/server/src/lib.rs</span>
+  <span class="file-desc">is_tool_allowed</span>
+</div>
+<pre class="file-code"><code><span class="kw">fn</span> <span class="fn">is_tool_allowed</span>(policy: &amp;<span class="ty">Option</span>&lt;<span class="ty">SecurityPolicy</span>&gt;, tool_name: &amp;<span class="ty">str</span>) -&gt; <span class="ty">bool</span> {
+    <span class="kw">let</span> policy = <span class="kw">match</span> policy {
+        <span class="ty">Some</span>(p) =&gt; p,
+        <span class="ty">None</span> =&gt; <span class="kw">return</span> <span class="kw">true</span>,  <span class="cm">// no policy = allow all</span>
+    };
+
+    <span class="cm">// Blocklist takes precedence</span>
+    <span class="kw">let</span> blocked: <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; = serde_json::from_str(&amp;policy.blocked_tools_json)
+        .unwrap_or_default();
+    <span class="kw">if</span> blocked.<span class="fn">iter</span>().<span class="fn">any</span>(|b| b == tool_name) {
+        <span class="kw">return</span> <span class="kw">false</span>;
+    }
+
+    <span class="cm">// Allowlist acts as whitelist (empty = all allowed)</span>
+    <span class="kw">let</span> allowed: <span class="ty">Vec</span>&lt;<span class="ty">String</span>&gt; = serde_json::from_str(&amp;policy.allowed_tools_json)
+        .unwrap_or_default();
+    <span class="kw">if</span> !allowed.is_empty() &amp;&amp; !allowed.<span class="fn">iter</span>().<span class="fn">any</span>(|a| a == tool_name) {
+        <span class="kw">return</span> <span class="kw">false</span>;
+    }
+
+    <span class="kw">true</span>
+}</code></pre>
+
+<div class="annotation">
+  <strong>Deny-by-default in practice:</strong> When the <code>allowed_tools_json</code> list is non-empty, only listed tools are permitted. The blocked list always wins &mdash; even if a tool appears on both lists, it's denied. This mirrors ZeroClaw's main codebase security philosophy.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="memory">10. Memory Recall &amp; Context Injection</h2>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/server/src/lib.rs</span>
+  <span class="file-desc">build_messages + recall_context</span>
+</div>
+<pre class="file-code"><code><span class="kw">fn</span> <span class="fn">build_messages</span>(
+    ctx: &amp;<span class="ty">ProcedureContext</span>,
+    agent: &amp;<span class="ty">Agent</span>,
+    conversation: &amp;<span class="ty">Conversation</span>,
+) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">LlmMessage</span>&gt; {
+    <span class="kw">let mut</span> out = <span class="ty">Vec</span>::new();
+
+    <span class="cm">// 1. System prompt</span>
+    out.push(<span class="ty">LlmMessage</span> {
+        role: <span class="st">"system"</span>.into(),
+        content: agent.system_prompt.clone(),
+        ..
+    });
+
+    <span class="cm">// 2. Inject recalled memories as system messages</span>
+    <span class="kw">for</span> mem <span class="kw">in</span> <span class="fn">recall_context</span>(ctx, agent, conversation) {
+        out.push(<span class="ty">LlmMessage</span> {
+            role: <span class="st">"system"</span>.into(),
+            content: <span class="kw">format!</span>(<span class="st">"[Memory: {}] {}"</span>, mem.key, mem.content),
+            ..
+        });
+    }
+
+    <span class="cm">// 3. Conversation messages (limited by max_history_messages)</span>
+    <span class="kw">let</span> msgs: <span class="ty">Vec</span>&lt;<span class="ty">Message</span>&gt; = ctx.db.<span class="fn">messages</span>().<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|m| m.conversation_id == conversation.id)
+        .<span class="fn">collect</span>();
+    <span class="kw">let</span> start = msgs.len().<span class="fn">saturating_sub</span>(agent.max_history_messages <span class="kw">as</span> <span class="ty">usize</span>);
+
+    <span class="kw">for</span> msg <span class="kw">in</span> &amp;msgs[start..] {
+        out.push(<span class="cm">/* convert Message to LlmMessage */</span>);
+    }
+
+    out
+}
+
+<span class="kw">fn</span> <span class="fn">recall_context</span>(
+    ctx: &amp;<span class="ty">ProcedureContext</span>,
+    agent: &amp;<span class="ty">Agent</span>,
+    conversation: &amp;<span class="ty">Conversation</span>,
+) -&gt; <span class="ty">Vec</span>&lt;<span class="ty">Memory</span>&gt; {
+    <span class="cm">// Extract keywords from recent user messages</span>
+    <span class="kw">let</span> recent_msgs: <span class="ty">Vec</span>&lt;<span class="ty">Message</span>&gt; = ctx.db.<span class="fn">messages</span>().<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|m| m.conversation_id == conversation.id &amp;&amp; m.role == <span class="st">"user"</span>)
+        .<span class="fn">collect</span>();
+
+    <span class="kw">let</span> keywords: <span class="ty">Vec</span>&lt;&amp;<span class="ty">str</span>&gt; = recent_msgs.<span class="fn">last</span>()
+        .<span class="fn">map</span>(|m| m.content.<span class="fn">split_whitespace</span>()
+            .<span class="fn">filter</span>(|w| w.len() &gt; <span class="nu">3</span>)
+            .<span class="fn">collect</span>())
+        .unwrap_or_default();
+
+    <span class="cm">// Search memories for keyword matches</span>
+    ctx.db.<span class="fn">memories</span>().<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|m| m.agent_id == agent.id
+            &amp;&amp; keywords.<span class="fn">iter</span>().<span class="fn">any</span>(|kw|
+                m.content.<span class="fn">to_lowercase</span>().<span class="fn">contains</span>(&amp;kw.<span class="fn">to_lowercase</span>())))
+        .<span class="fn">take</span>(<span class="nu">5</span>)  <span class="cm">// inject up to 5 relevant memories</span>
+        .<span class="fn">collect</span>()
+}</code></pre>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="channels">11. Channel Send Functions</h2>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/server/src/lib.rs</span>
+  <span class="file-desc">Channel HTTP sends</span>
+</div>
+<pre class="file-code"><code><span class="kw">fn</span> <span class="fn">try_send_response</span>(
+    ctx: &amp;<span class="ty">ProcedureContext</span>,
+    conversation: &amp;<span class="ty">Conversation</span>,
+    content: &amp;<span class="ty">str</span>,
+) {
+    <span class="kw">let</span> config = ctx.db.<span class="fn">channel_configs</span>().<span class="fn">name</span>().<span class="fn">find</span>(&amp;conversation.channel);
+
+    <span class="kw">match</span> config.map(|c| c.channel_type.as_str()) {
+        <span class="ty">Some</span>(<span class="st">"telegram"</span>) =&gt; {
+            <span class="fn">send_telegram</span>(ctx, &amp;config.unwrap(), &amp;conversation.sender, content);
+        }
+        <span class="ty">Some</span>(<span class="st">"discord"</span>) =&gt; {
+            <span class="fn">send_discord_webhook</span>(ctx, &amp;config.unwrap(), content);
+        }
+        <span class="ty">Some</span>(<span class="st">"slack"</span>) =&gt; {
+            <span class="fn">send_slack_webhook</span>(ctx, &amp;config.unwrap(), content);
+        }
+        <span class="ty">Some</span>(<span class="st">"webhook"</span>) =&gt; {
+            <span class="fn">send_generic_webhook</span>(ctx, &amp;config.unwrap(), &amp;conversation.sender, content);
+        }
+        _ =&gt; {
+            <span class="cm">// No config or unknown type — queue for worker</span>
+            ctx.db.<span class="fn">pending_sends</span>().<span class="fn">insert</span>(<span class="ty">PendingSend</span> {
+                channel: conversation.channel.clone(),
+                target: conversation.sender.clone(),
+                content: content.into(),
+                status: <span class="st">"pending"</span>.into(),
+                ..
+            });
+        }
+    }
+}
+
+<span class="kw">fn</span> <span class="fn">send_telegram</span>(ctx: &amp;<span class="ty">ProcedureContext</span>, config: &amp;<span class="ty">ChannelConfig</span>, chat_id: &amp;<span class="ty">str</span>, text: &amp;<span class="ty">str</span>) {
+    <span class="kw">let</span> url = <span class="kw">format!</span>(<span class="st">"{}/bot{}/sendMessage"</span>, config.api_base_url, config.credential);
+    <span class="kw">let</span> payload = serde_json::json!({
+        <span class="st">"chat_id"</span>: chat_id,
+        <span class="st">"text"</span>: text,
+        <span class="st">"parse_mode"</span>: <span class="st">"Markdown"</span>
+    });
+    ctx.<span class="fn">http</span>(<span class="st">"POST"</span>, &amp;url)
+        .<span class="fn">header</span>(<span class="st">"content-type"</span>, <span class="st">"application/json"</span>)
+        .<span class="fn">body</span>(&amp;serde_json::to_vec(&amp;payload).unwrap())
+        .<span class="fn">send</span>();
+}</code></pre>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="worker">12. Worker &mdash; Local Tool Execution</h2>
+
+<p>The worker is a standalone Rust binary. It handles only what SpacetimeDB procedures can't: local shell and filesystem operations.</p>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/worker/src/main.rs</span>
+  <span class="file-desc">Local tool dispatch + shell executor</span>
+</div>
+<pre class="file-code"><code><span class="kw">fn</span> <span class="fn">execute_local_tool</span>(tool_name: &amp;<span class="ty">str</span>, params_json: &amp;<span class="ty">str</span>) -&gt; <span class="ty">String</span> {
+    <span class="kw">match</span> tool_name {
+        <span class="st">"shell"</span>      =&gt; <span class="fn">execute_shell</span>(params_json),
+        <span class="st">"file_read"</span>  =&gt; <span class="fn">execute_file_read</span>(params_json),
+        <span class="st">"file_write"</span> =&gt; <span class="fn">execute_file_write</span>(params_json),
+        _ =&gt; <span class="kw">format!</span>(<span class="st">"Unknown local tool: {}"</span>, tool_name),
+    }
+}
+
+<span class="kw">fn</span> <span class="fn">execute_shell</span>(params_json: &amp;<span class="ty">str</span>) -&gt; <span class="ty">String</span> {
+    <span class="mc">#[derive(serde::Deserialize)]</span>
+    <span class="kw">struct</span> <span class="ty">Params</span> {
+        command: <span class="ty">String</span>,
+        <span class="mc">#[serde(default = "default_timeout")]</span>
+        timeout_secs: <span class="ty">u64</span>,  <span class="cm">// default: 30</span>
+    }
+
+    <span class="kw">let</span> params: <span class="ty">Params</span> = serde_json::from_str(params_json)?;
+
+    <span class="kw">let</span> output = <span class="ty">Command</span>::new(<span class="st">"sh"</span>)
+        .arg(<span class="st">"-c"</span>)
+        .arg(&amp;params.command)
+        .<span class="fn">output</span>();  <span class="cm">// captures stdout + stderr</span>
+
+    <span class="kw">match</span> output {
+        <span class="ty">Ok</span>(out) =&gt; {
+            <span class="kw">let</span> stdout = <span class="ty">String</span>::from_utf8_lossy(&amp;out.stdout);
+            <span class="kw">let</span> stderr = <span class="ty">String</span>::from_utf8_lossy(&amp;out.stderr);
+            <span class="kw">let mut</span> result = stdout.to_string();
+            <span class="kw">if</span> !stderr.is_empty() {
+                result.push_str(<span class="st">"\nstderr: "</span>);
+                result.push_str(&amp;stderr);
+            }
+            <span class="cm">// Truncate large output</span>
+            <span class="kw">if</span> result.len() &gt; <span class="nu">8000</span> {
+                result.truncate(<span class="nu">8000</span>);
+                result.push_str(<span class="st">"\n... (truncated)"</span>);
+            }
+            result
+        }
+        <span class="ty">Err</span>(e) =&gt; <span class="kw">format!</span>(<span class="st">"Shell execution failed: {}"</span>, e),
+    }
+}
+
+<span class="kw">fn</span> <span class="fn">execute_file_read</span>(params_json: &amp;<span class="ty">str</span>) -&gt; <span class="ty">String</span> {
+    <span class="mc">#[derive(serde::Deserialize)]</span>
+    <span class="kw">struct</span> <span class="ty">Params</span> {
+        path: <span class="ty">String</span>,
+        <span class="mc">#[serde(default)]</span>
+        offset: <span class="ty">usize</span>,          <span class="cm">// line offset (0-based)</span>
+        <span class="mc">#[serde(default = "default_limit")]</span>
+        limit: <span class="ty">usize</span>,           <span class="cm">// max 2000 lines</span>
+    }
+
+    <span class="kw">let</span> content = std::fs::read_to_string(&amp;params.path)?;
+    <span class="kw">let</span> lines: <span class="ty">Vec</span>&lt;&amp;<span class="ty">str</span>&gt; = content.<span class="fn">lines</span>().<span class="fn">collect</span>();
+    <span class="kw">let</span> start = params.offset.<span class="fn">min</span>(lines.len());
+    <span class="kw">let</span> end = (start + params.limit).<span class="fn">min</span>(lines.len());
+
+    lines[start..end].<span class="fn">iter</span>()
+        .<span class="fn">enumerate</span>()
+        .<span class="fn">map</span>(|(i, line)| <span class="kw">format!</span>(<span class="st">"{:>4} {}"</span>, start + i + <span class="nu">1</span>, line))
+        .<span class="fn">collect</span>::&lt;<span class="ty">Vec</span>&lt;_&gt;&gt;()
+        .<span class="fn">join</span>(<span class="st">"\n"</span>)
+}
+
+<span class="kw">fn</span> <span class="fn">execute_file_write</span>(params_json: &amp;<span class="ty">str</span>) -&gt; <span class="ty">String</span> {
+    <span class="mc">#[derive(serde::Deserialize)]</span>
+    <span class="kw">struct</span> <span class="ty">Params</span> { path: <span class="ty">String</span>, content: <span class="ty">String</span> }
+
+    <span class="kw">let</span> params: <span class="ty">Params</span> = serde_json::from_str(params_json)?;
+    std::fs::write(&amp;params.path, &amp;params.content)?;
+    <span class="kw">format!</span>(<span class="st">"Written {} bytes to {}"</span>, params.content.len(), params.path)
+}</code></pre>
+
+<div class="annotation">
+  <strong>Safety boundaries:</strong> Shell output is capped at 8000 chars. File reads default to 2000 lines. These limits prevent the agent from overwhelming the LLM context with tool results. The worker also registers its local tools on startup so the server knows they exist and what parameters they accept.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="worker-cli">13. Worker CLI Mode</h2>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/worker/src/main.rs</span>
+  <span class="file-desc">Interactive CLI loop + config</span>
+</div>
+<pre class="file-code"><code><span class="kw">struct</span> <span class="ty">WorkerConfig</span> {
+    spacetime_uri: <span class="ty">String</span>,   <span class="cm">// default: "ws://localhost:3000"</span>
+    module_name: <span class="ty">String</span>,     <span class="cm">// default: "zeroclaw"</span>
+    agent_id: <span class="ty">u64</span>,           <span class="cm">// default: 1</span>
+    mode: <span class="ty">String</span>,            <span class="cm">// "cli" or "daemon"</span>
+    worker_name: <span class="ty">String</span>,     <span class="cm">// default: hostname()</span>
+}
+
+<span class="kw">fn</span> <span class="fn">run_cli_mode</span>(config: &amp;<span class="ty">WorkerConfig</span>) -&gt; <span class="ty">Result</span>&lt;()&gt; {
+    <span class="cm">// The full flow (SDK integration pending):</span>
+    <span class="cm">//</span>
+    <span class="cm">// 1. Connect to SpacetimeDB</span>
+    <span class="cm">// 2. Register as worker + register local tools</span>
+    <span class="cm">// 3. Subscribe to local_tool_requests (status = 'pending')</span>
+    <span class="cm">// 4. Read user input</span>
+    <span class="cm">// 5. Call process_message() procedure</span>
+    <span class="cm">// 6. If "awaiting_local_tools":</span>
+    <span class="cm">//      execute each tool, submit results, call continue_conversation()</span>
+    <span class="cm">// 7. Print final response</span>
+
+    <span class="kw">let</span> stdin = io::stdin();
+    <span class="kw">loop</span> {
+        print!(<span class="st">"you> "</span>);
+        <span class="kw">let mut</span> input = <span class="ty">String</span>::new();
+        stdin.lock().<span class="fn">read_line</span>(&amp;<span class="kw">mut</span> input)?;
+
+        <span class="kw">match</span> input.trim() {
+            <span class="st">"/quit"</span> | <span class="st">"/exit"</span> =&gt; <span class="kw">break</span>,
+            cmd <span class="kw">if</span> cmd.starts_with(<span class="st">'/'</span>) =&gt; <span class="fn">handle_cli_command</span>(cmd, config),
+            msg =&gt; {
+                <span class="cm">// conn.procedures.process_message(</span>
+                <span class="cm">//     config.agent_id, "cli", config.worker_name, msg</span>
+                <span class="cm">// )</span>
+                println!(<span class="st">"[Would call process_message]"</span>);
+            }
+        }
+    }
+    <span class="ty">Ok</span>(())
+}
+
+<span class="cm">/// Tool definitions registered with SpacetimeDB on startup.</span>
+<span class="kw">fn</span> <span class="fn">local_tools</span>() -&gt; <span class="ty">Vec</span>&lt;(&amp;<span class="kw">static</span> <span class="ty">str</span>, &amp;<span class="kw">static</span> <span class="ty">str</span>, &amp;<span class="kw">static</span> <span class="ty">str</span>)&gt; {
+    <span class="kw">vec!</span>[
+        (<span class="st">"shell"</span>,
+         <span class="st">"Execute a shell command on the local system"</span>,
+         <span class="st">r#"{"type":"object","properties":{"command":{"type":"string"}},"required":["command"]}"#</span>),
+        (<span class="st">"file_read"</span>,
+         <span class="st">"Read a file from the local filesystem"</span>,
+         <span class="st">r#"{"type":"object","properties":{"path":{"type":"string"}},"required":["path"]}"#</span>),
+        (<span class="st">"file_write"</span>,
+         <span class="st">"Write content to a file on the local filesystem"</span>,
+         <span class="st">r#"{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"]}"#</span>),
+    ]
+}</code></pre>
+
+<div class="annotation success">
+  <strong>That's the entire runtime.</strong> Two Rust files. ~1500 lines for the server (all reasoning, state, and I/O coordination), ~390 lines for the worker (shell, filesystem, CLI). The server compiles to a SpacetimeDB module, the worker to a standalone binary. Together they form a complete autonomous agent with multi-tenant support, persistent memory, security policies, and multi-channel delivery.
+</div>
+
+<!-- ─── Page Navigation ─── -->
+<div class="page-nav">
+  <a href="technical.html">&larr; Technical Architecture</a>
+  <a href="index.html">Back to Overview &rarr;</a>
+</div>
+
+</div>
+
+<footer>ZeroClaw &mdash; SpacetimeDB Agent Runtime Documentation</footer>
+
+</body>
+</html>

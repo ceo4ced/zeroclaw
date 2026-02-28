@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZeroClaw SpacetimeDB Runtime — Technical Architecture</title>
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --text: #c9d1d9; --text-muted: #8b949e;
+    --accent: #58a6ff; --accent-dim: #1f6feb;
+    --green: #3fb950; --orange: #d29922; --red: #f85149;
+    --purple: #bc8cff; --cyan: #39d2c0; --yellow: #e3b341;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg); color: var(--text); line-height: 1.6;
+  }
+  .top-nav {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(13,17,23,0.92); backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--border);
+    padding: 0.75rem 2rem; display: flex; align-items: center; gap: 1.5rem;
+  }
+  .top-nav .logo { font-weight: 700; font-size: 1.1rem; color: var(--accent); }
+  .top-nav a {
+    color: var(--text-muted); text-decoration: none; font-size: 0.9rem;
+    border-bottom: 2px solid transparent; transition: all 0.2s; padding: 0.25rem 0;
+  }
+  .top-nav a:hover, .top-nav a.active { color: var(--text); border-bottom-color: var(--accent); }
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+  .page-header {
+    padding: 3.5rem 0 2rem;
+    border-bottom: 1px solid var(--border); margin-bottom: 3rem;
+  }
+  .page-header .section-label {
+    display: inline-block; font-size: 0.75rem; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--accent); font-weight: 700; margin-bottom: 0.5rem;
+  }
+  .page-header h1 { font-size: 2.2rem; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 0.5rem; }
+  .page-header p { color: var(--text-muted); font-size: 1.05rem; max-width: 700px; }
+
+  h2 { font-size: 1.4rem; margin: 3rem 0 1rem; padding-top: 1.5rem; border-top: 1px solid var(--border); }
+  h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+  h3 { font-size: 1.1rem; margin: 1.5rem 0 0.75rem; color: var(--accent); }
+  p { margin-bottom: 0.75rem; }
+  ul, ol { margin: 0.5rem 0 1rem 1.5rem; }
+  li { margin-bottom: 0.35rem; font-size: 0.93rem; }
+
+  /* Code blocks */
+  pre {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+    padding: 1.25rem; margin: 1rem 0 1.5rem; overflow-x: auto;
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 0.82rem; line-height: 1.55;
+  }
+  code {
+    font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+    font-size: 0.88em; background: var(--surface); padding: 0.15em 0.35em;
+    border-radius: 4px;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; }
+  .c-kw { color: var(--red); }        /* keywords */
+  .c-type { color: var(--cyan); }     /* types */
+  .c-str { color: var(--green); }     /* strings */
+  .c-cmt { color: var(--text-muted); font-style: italic; } /* comments */
+  .c-fn { color: var(--purple); }     /* functions */
+  .c-accent { color: var(--accent); }
+  .c-green { color: var(--green); }
+  .c-orange { color: var(--orange); }
+
+  /* Architecture diagram */
+  .arch-diagram {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.5rem 2rem; overflow-x: auto; margin: 1.5rem 0 2rem;
+  }
+  .arch-diagram pre { background: none; border: none; padding: 0; margin: 0; }
+
+  /* Table styles */
+  table {
+    width: 100%; border-collapse: collapse;
+    background: var(--surface); border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--border); margin: 1rem 0 1.5rem;
+  }
+  th, td { padding: 0.7rem 1rem; text-align: left; font-size: 0.88rem; border-bottom: 1px solid var(--border); }
+  th { background: rgba(88,166,255,0.06); color: var(--accent); font-weight: 600; }
+  tr:last-child td { border-bottom: none; }
+
+  /* Callout boxes */
+  .callout {
+    border-left: 3px solid var(--accent); background: rgba(88,166,255,0.04);
+    padding: 1rem 1.25rem; border-radius: 0 8px 8px 0; margin: 1rem 0 1.5rem;
+    font-size: 0.92rem;
+  }
+  .callout.warn { border-left-color: var(--orange); background: rgba(210,153,34,0.04); }
+  .callout.success { border-left-color: var(--green); background: rgba(63,185,80,0.04); }
+  .callout strong { color: var(--text); }
+
+  /* Two-column layout */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin: 1.5rem 0; }
+  .col-card {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.25rem;
+  }
+  .col-card h4 { font-size: 0.95rem; margin-bottom: 0.5rem; color: var(--cyan); }
+  .col-card p, .col-card ul { font-size: 0.88rem; }
+  .col-card ul { margin-left: 1.2rem; }
+
+  /* Navigation links */
+  .page-nav {
+    display: flex; justify-content: space-between; padding: 2rem 0 3rem;
+    border-top: 1px solid var(--border); margin-top: 3rem;
+  }
+  .page-nav a {
+    color: var(--accent); text-decoration: none; font-weight: 600;
+    padding: 0.5rem 1rem; border: 1px solid var(--border); border-radius: 8px;
+    transition: all 0.2s;
+  }
+  .page-nav a:hover { border-color: var(--accent); background: rgba(88,166,255,0.06); }
+  footer {
+    border-top: 1px solid var(--border); padding: 2rem;
+    text-align: center; color: var(--text-muted); font-size: 0.85rem;
+  }
+  @media (max-width: 700px) { .two-col { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<nav class="top-nav">
+  <span class="logo">ZeroClaw</span>
+  <a href="index.html">Overview</a>
+  <a href="technical.html" class="active">Technical</a>
+  <a href="implementation.html">Implementation</a>
+</nav>
+
+<div class="container">
+<div class="page-header">
+  <div class="section-label">Technical Architecture</div>
+  <h1>How the SpacetimeDB Runtime Works</h1>
+  <p>Two-component architecture, data model, orchestration loop, security model, and deployment topology.</p>
+</div>
+
+<!-- ─── Component Map ─── -->
+<h2>Component Architecture</h2>
+
+<p>The runtime is a Rust workspace with two crates. The <strong>server</strong> is a SpacetimeDB module containing all reasoning logic. The <strong>worker</strong> is a thin binary that handles local I/O.</p>
+
+<div class="arch-diagram"><pre>
+┌──────────────────────────────────────────────────────────────────────────┐
+│                        <span class="c-accent">SpacetimeDB Instance</span>                            │
+│                                                                          │
+│  ┌─────────────────────────────────┐  ┌───────────────────────────────┐  │
+│  │       <span class="c-type">Reducers</span> (State)           │  │     <span class="c-fn">Procedures</span> (I/O)          │  │
+│  │                                 │  │                               │  │
+│  │  create_agent()                 │  │  <span class="c-accent">process_message()</span>           │  │
+│  │  update_agent()                 │  │    → store msg, build ctx     │  │
+│  │  configure_channel()            │  │    → call LLM via ctx.http    │  │
+│  │  register_worker()              │  │    → dispatch tools           │  │
+│  │  store_memory() / forget()      │  │    → send channel response    │  │
+│  │  set_security_policy()          │  │                               │  │
+│  │  submit_local_tool_result()     │  │  <span class="c-green">continue_conversation()</span>     │  │
+│  │                                 │  │    → resume after local tools │  │
+│  └─────────────────────────────────┘  │                               │  │
+│                                       │  <span class="c-orange">send_channel_message()</span>      │  │
+│  ┌─────────────────────────────────┐  │    → Telegram/Discord/Slack   │  │
+│  │       <span class="c-purple">Tables</span> (State)             │  └───────────────────────────────┘  │
+│  │                                 │                                     │
+│  │  agents            memories     │                                     │
+│  │  conversations     messages     │  ┌───────────────────────────────┐  │
+│  │  security_policies              │  │    <span class="c-cmt">Scheduled</span>                  │  │
+│  │  tool_registry                  │  │  run_hygiene() — hourly       │  │
+│  │  channel_configs                │  │    cleans completed requests  │  │
+│  │  local_tool_requests            │  └───────────────────────────────┘  │
+│  │  pending_sends     workers      │                                     │
+│  └─────────────────────────────────┘                                     │
+└────────────────────────────────┬─────────────────────────────────────────┘
+                                 │
+               WebSocket (subscriptions + reducer calls)
+                                 │
+                ┌────────────────┴────────────────┐
+                │        <span class="c-green">Worker Process</span>              │
+                │                                  │
+                │  subscribe(local_tool_requests)  │
+                │  subscribe(pending_sends)        │
+                │                                  │
+                │  execute_local_tool()            │
+                │    ├─ shell (sh -c)              │
+                │    ├─ file_read                  │
+                │    └─ file_write                 │
+                │                                  │
+                │  submit_local_tool_result()      │
+                │  → triggers continue_convo       │
+                └──────────────────────────────────┘
+</pre></div>
+
+<div class="callout success">
+  <strong>Key insight:</strong> Conversations that only use HTTP tools (web search, API calls, memory) complete entirely inside SpacetimeDB with zero worker involvement. The worker is only needed for shell execution and filesystem access.
+</div>
+
+<!-- ─── Data Model ─── -->
+<h2>Data Model</h2>
+
+<p>All state is stored in SpacetimeDB tables. These are the 11 tables that make up the complete runtime.</p>
+
+<h3>Core Entity Tables</h3>
+<table>
+  <tr><th>Table</th><th>Primary Key</th><th>Purpose</th><th>Key Fields</th></tr>
+  <tr><td><code>agents</code></td><td><code>id</code> (auto_inc)</td><td>Agent identity and LLM config</td><td>name, model, api_base_url, api_key, system_prompt, max_tool_iterations, owner</td></tr>
+  <tr><td><code>conversations</code></td><td><code>id</code> (auto_inc)</td><td>Chat sessions scoped to agent + channel + sender</td><td>agent_id, channel, sender, active, tool_iteration</td></tr>
+  <tr><td><code>messages</code></td><td><code>id</code> (auto_inc)</td><td>Immutable message log</td><td>conversation_id, role, content, tool_call_id, tool_calls_json</td></tr>
+  <tr><td><code>memories</code></td><td><code>id</code> (auto_inc)</td><td>Persistent knowledge across conversations</td><td>agent_id, key (unique), content, category, session_id</td></tr>
+</table>
+
+<h3>Execution Tables</h3>
+<table>
+  <tr><th>Table</th><th>Purpose</th><th>State Machine</th></tr>
+  <tr><td><code>local_tool_requests</code></td><td>Queue for worker-executed tools</td><td>pending &rarr; processing &rarr; completed | failed</td></tr>
+  <tr><td><code>pending_sends</code></td><td>Outbound messages for non-HTTP channels</td><td>pending &rarr; sent | failed</td></tr>
+</table>
+
+<h3>Configuration Tables</h3>
+<table>
+  <tr><th>Table</th><th>Primary Key</th><th>Purpose</th></tr>
+  <tr><td><code>security_policies</code></td><td><code>agent_id</code></td><td>Per-agent autonomy, allowlist/blocklist, rate limits</td></tr>
+  <tr><td><code>tool_registry</code></td><td><code>name</code></td><td>Available tools with JSON schemas and execution mode (http/local)</td></tr>
+  <tr><td><code>channel_configs</code></td><td><code>name</code></td><td>Channel credentials and API endpoints</td></tr>
+  <tr><td><code>workers</code></td><td><code>identity</code></td><td>Connected worker instances and capabilities</td></tr>
+  <tr><td><code>hygiene_schedule</code></td><td><code>scheduled_id</code></td><td>Automatic cleanup scheduling</td></tr>
+</table>
+
+<!-- ─── Orchestration Loop ─── -->
+<h2>Orchestration Loop</h2>
+
+<p>The <code>process_message()</code> procedure is the main entry point. It runs the full agent reasoning loop inside SpacetimeDB.</p>
+
+<div class="arch-diagram"><pre>
+<span class="c-fn">process_message</span>(agent_id, channel, sender, content)
+  │
+  ├─ <span class="c-cmt">Store user message in messages table</span>
+  ├─ <span class="c-cmt">Auto-save to memories (if content &gt; 20 chars)</span>
+  │
+  └─ <span class="c-fn">orchestration_loop</span>(ctx, agent, conversation)
+       │
+       <span class="c-kw">for</span> iteration <span class="c-kw">in</span> 0..max_tool_iterations:
+       │
+       ├─ <span class="c-fn">build_messages</span>()
+       │    ├─ System prompt
+       │    ├─ <span class="c-fn">recall_context</span>() → inject relevant memories
+       │    └─ Conversation history (limited by max_history_messages)
+       │
+       ├─ <span class="c-fn">build_tools</span>() → tool definitions from tool_registry
+       │
+       ├─ <span class="c-accent">POST</span> to LLM API via <span class="c-type">ctx.http</span>
+       │    Request: { model, messages, tools, max_tokens }
+       │    Response: { content, tool_calls[] }
+       │
+       ├─ Store assistant message
+       │
+       ├─ <span class="c-kw">if</span> no tool_calls:
+       │    ├─ <span class="c-fn">try_send_response</span>() → HTTP channel send
+       │    └─ <span class="c-kw">return</span> ProcessResult { status: <span class="c-str">"completed"</span> }
+       │
+       └─ <span class="c-kw">for each</span> tool_call:
+            │
+            ├─ <span class="c-fn">is_tool_allowed</span>(policy, tool_name)
+            │    ├─ blocked_tools list → <span class="c-orange">DENY</span>
+            │    ├─ allowed_tools non-empty & not in list → <span class="c-orange">DENY</span>
+            │    └─ otherwise → <span class="c-green">ALLOW</span>
+            │
+            ├─ Lookup in tool_registry → execution_mode
+            │
+            ├─ <span class="c-kw">if</span> <span class="c-str">"http"</span>:
+            │    ├─ <span class="c-fn">execute_http_tool</span>() inline
+            │    ├─ Store result as role=tool message
+            │    └─ <span class="c-kw">continue</span> loop (go back to LLM)
+            │
+            └─ <span class="c-kw">if</span> <span class="c-str">"local"</span>:
+                 ├─ Insert <span class="c-type">LocalToolRequest</span> row (status: pending)
+                 ├─ Collect in local_pending list
+                 └─ <span class="c-kw">return</span> ProcessResult { status: <span class="c-str">"awaiting_local_tools"</span> }
+</pre></div>
+
+<!-- ─── HTTP Tools ─── -->
+<h2>Built-in HTTP Tools</h2>
+
+<p>These tools execute inline inside procedures using <code>ctx.http</code> &mdash; no worker needed.</p>
+
+<div class="two-col">
+  <div class="col-card">
+    <h4>web_search</h4>
+    <p>Searches DuckDuckGo HTML results. URL-encodes the query, fetches first 2000 chars of the response page. No API key required.</p>
+  </div>
+  <div class="col-card">
+    <h4>http_request</h4>
+    <p>Generic HTTP client. Supports GET/POST with custom body. Response truncated to 4000 chars. Used for API integrations.</p>
+  </div>
+  <div class="col-card">
+    <h4>memory_store</h4>
+    <p>Upserts a key/value pair into the <code>memories</code> table. Supports categories: core, daily, conversation. Replaces existing entries by key.</p>
+  </div>
+  <div class="col-card">
+    <h4>memory_recall</h4>
+    <p>Full-text keyword search across memories. Returns top 10 matches with key, content, and category. Used by the LLM to retrieve stored knowledge.</p>
+  </div>
+</div>
+
+<!-- ─── Local Tools ─── -->
+<h2>Local Tools (Worker-Executed)</h2>
+
+<p>These tools require the worker process because they access the local operating system.</p>
+
+<table>
+  <tr><th>Tool</th><th>What it Does</th><th>Safety</th></tr>
+  <tr>
+    <td><code>shell</code></td>
+    <td>Executes a command via <code>sh -c</code>. Captures stdout + stderr.</td>
+    <td>30s default timeout. Output truncated at 8000 chars.</td>
+  </tr>
+  <tr>
+    <td><code>file_read</code></td>
+    <td>Reads a file with optional line offset and limit.</td>
+    <td>Default limit: 2000 lines. Returns with line numbers.</td>
+  </tr>
+  <tr>
+    <td><code>file_write</code></td>
+    <td>Writes content to a file path.</td>
+    <td>Returns bytes written. Subject to security policy check.</td>
+  </tr>
+</table>
+
+<!-- ─── Security Model ─── -->
+<h2>Security Model</h2>
+
+<p>Per-agent security policies are stored in the <code>security_policies</code> table. The system is <strong>deny-by-default</strong>.</p>
+
+<pre><code><span class="c-type">SecurityPolicy</span> {
+    agent_id:             <span class="c-type">u64</span>,
+    autonomy_level:       <span class="c-type">String</span>,     <span class="c-cmt">// "manual" | "semi_auto" | "auto"</span>
+    allowed_tools_json:   <span class="c-type">String</span>,     <span class="c-cmt">// JSON array — whitelist (empty = all)</span>
+    blocked_tools_json:   <span class="c-type">String</span>,     <span class="c-cmt">// JSON array — blacklist (takes precedence)</span>
+    max_tool_iterations:  <span class="c-type">u32</span>,
+    rate_limit_per_minute:<span class="c-type">u32</span>,
+}</code></pre>
+
+<h3>Authorization Logic</h3>
+<div class="arch-diagram"><pre>
+<span class="c-fn">is_tool_allowed</span>(policy, tool_name) → <span class="c-type">bool</span>
+  │
+  ├─ tool in <span class="c-orange">blocked_tools</span>?        → <span class="c-orange">DENY</span>
+  ├─ allowed_tools non-empty?
+  │   └─ tool NOT in allowed_tools? → <span class="c-orange">DENY</span>
+  └─ otherwise                      → <span class="c-green">ALLOW</span>
+
+<span class="c-cmt">Blocked list always wins. Then allowed list acts as whitelist.</span>
+<span class="c-cmt">Empty allowed list = all tools permitted (minus blocked).</span>
+</pre></div>
+
+<h3>Multi-Tenancy Isolation</h3>
+<ul>
+  <li>Each agent has its own security policy, memories, and conversations</li>
+  <li>Agent ownership tracked via SpacetimeDB <code>Identity</code></li>
+  <li>Workers are registered and tracked by identity</li>
+  <li>Tool authorization is checked per-call, per-agent</li>
+</ul>
+
+<!-- ─── Channel Architecture ─── -->
+<h2>Channel Architecture</h2>
+
+<p>Channels route responses to messaging platforms. HTTP-capable channels are sent directly from procedures. Non-HTTP channels use the <code>pending_sends</code> table as a queue.</p>
+
+<div class="two-col">
+  <div class="col-card">
+    <h4>Direct HTTP Send (Procedures)</h4>
+    <ul>
+      <li><strong>Telegram:</strong> POST to <code>/bot{token}/sendMessage</code></li>
+      <li><strong>Discord:</strong> POST to webhook URL with <code>{"content": ...}</code></li>
+      <li><strong>Slack:</strong> POST to webhook URL with <code>{"text": ...}</code></li>
+      <li><strong>Generic webhook:</strong> POST with <code>{"target", "content"}</code></li>
+    </ul>
+  </div>
+  <div class="col-card">
+    <h4>Queued Send (Worker-Assisted)</h4>
+    <ul>
+      <li>Fallback when no channel config is found</li>
+      <li>Used for non-HTTP channels (iMessage, IRC)</li>
+      <li>Worker subscribes to <code>pending_sends</code> table</li>
+      <li>Picks up pending rows and delivers locally</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ─── Memory System ─── -->
+<h2>Memory Architecture</h2>
+
+<p>Memories persist across conversations. They're injected into the LLM context via keyword-based recall.</p>
+
+<pre><code><span class="c-fn">build_messages</span>(ctx, agent, conversation) → <span class="c-type">Vec&lt;LlmMessage&gt;</span>
+  │
+  ├─ <span class="c-str">"system"</span>: agent.system_prompt
+  │
+  ├─ <span class="c-fn">recall_context</span>(ctx, agent, conversation)
+  │   ├─ Extract keywords from recent user messages (words &gt; 3 chars)
+  │   ├─ Search memories table for keyword matches
+  │   └─ Inject top 5 as <span class="c-str">"system"</span> messages: <span class="c-str">"[Memory: {key}] {content}"</span>
+  │
+  └─ Recent conversation messages (limited by max_history_messages)</code></pre>
+
+<div class="callout">
+  <strong>Auto-save:</strong> Every user message longer than 20 characters is automatically saved to the <code>memories</code> table with category <code>"conversation"</code>. This ensures the agent builds context even without explicit memory_store calls.
+</div>
+
+<h3>Memory Categories</h3>
+<table>
+  <tr><th>Category</th><th>Purpose</th><th>Lifetime</th></tr>
+  <tr><td><code>core</code></td><td>Long-term facts, user preferences, system knowledge</td><td>Indefinite</td></tr>
+  <tr><td><code>daily</code></td><td>Session-scoped observations, task progress</td><td>Subject to hygiene</td></tr>
+  <tr><td><code>conversation</code></td><td>Auto-saved from user messages</td><td>Subject to hygiene</td></tr>
+</table>
+
+<!-- ─── Deployment ─── -->
+<h2>Deployment Topology</h2>
+
+<pre><code><span class="c-cmt"># 1. Publish the server module</span>
+<span class="c-fn">spacetime publish</span> zeroclaw
+
+<span class="c-cmt"># 2. Generate worker bindings</span>
+<span class="c-kw">cd</span> spacetime/server
+<span class="c-fn">spacetime generate</span> --lang rust --out-dir ../worker/src/module_bindings --project-path .
+
+<span class="c-cmt"># 3. Start the worker</span>
+SPACETIME_URI=ws://localhost:3000 \
+SPACETIME_MODULE=zeroclaw \
+ZEROCLAW_AGENT_ID=1 \
+<span class="c-fn">cargo run</span></code></pre>
+
+<div class="callout warn">
+  <strong>API key required:</strong> After publishing, call the <code>update_agent</code> reducer to set the LLM API key and model for your agent. Without this, LLM calls will fail.
+</div>
+
+<!-- ─── Relationship to Main ZeroClaw ─── -->
+<h2>Relationship to Main ZeroClaw</h2>
+
+<p>The SpacetimeDB runtime reimplements ZeroClaw's core agent loop using a database-centric architecture. Here's how the concepts map:</p>
+
+<table>
+  <tr><th>Main ZeroClaw (src/)</th><th>SpacetimeDB Runtime (spacetime/)</th></tr>
+  <tr><td><code>Provider</code> trait + 19 implementations</td><td>LLM calls via <code>ctx.http</code> in procedures</td></tr>
+  <tr><td><code>Channel</code> trait + 20 implementations</td><td><code>channel_configs</code> table + HTTP sends in procedures</td></tr>
+  <tr><td><code>Tool</code> trait + 31 implementations</td><td><code>tool_registry</code> table + http/local execution split</td></tr>
+  <tr><td><code>Memory</code> trait + SQLite/Postgres backends</td><td><code>memories</code> table with keyword search</td></tr>
+  <tr><td><code>SecurityPolicy</code> config struct</td><td><code>security_policies</code> table (mutable at runtime)</td></tr>
+  <tr><td>Agent loop in <code>src/agent/loop_.rs</code></td><td><code>orchestration_loop()</code> inside procedure</td></tr>
+  <tr><td>CLI in <code>src/main.rs</code></td><td>Worker CLI mode</td></tr>
+  <tr><td>Gateway in <code>src/gateway/</code></td><td>SpacetimeDB real-time subscriptions</td></tr>
+</table>
+
+<!-- ─── Page Navigation ─── -->
+<div class="page-nav">
+  <a href="index.html">&larr; Overview</a>
+  <a href="implementation.html">Implementation &rarr;</a>
+</div>
+
+</div>
+
+<footer>ZeroClaw &mdash; SpacetimeDB Agent Runtime Documentation</footer>
+
+</body>
+</html>
