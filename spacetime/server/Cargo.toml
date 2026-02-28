@@ -1,0 +1,14 @@
+[package]
+name = "zeroclaw-brain"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+spacetimedb = { version = "2.0", features = ["unstable"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+log = "0.4"
