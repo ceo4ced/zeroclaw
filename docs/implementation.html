@@ -154,7 +154,9 @@
     <li><a href="#reducers">State Management Reducers</a></li>
     <li><a href="#process-message">process_message() &mdash; Main Entry Point</a></li>
     <li><a href="#orchestration">orchestration_loop() &mdash; The Agent Brain</a></li>
+    <li><a href="#continue-convo">continue_conversation() &mdash; Resuming After Local Tools</a></li>
     <li><a href="#http-tools">HTTP Tool Execution</a></li>
+    <li><a href="#custom-tools">Adding a Custom Tool</a></li>
     <li><a href="#security">Security Policy Enforcement</a></li>
     <li><a href="#memory">Memory Recall &amp; Injection</a></li>
     <li><a href="#channels">Channel Send Functions</a></li>
@@ -804,6 +806,133 @@ spacetime/
 }</code></pre>
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="custom-tools">8b. Adding a Custom Tool</h2>
+
+<p>The tool system is designed for extension. Here is how to add your own tools, both HTTP (server-side) and local (worker-side).</p>
+
+<h3>Adding a Custom HTTP Tool</h3>
+
+<p>HTTP tools execute inside SpacetimeDB procedures via <code>ctx.http</code>. To add one, you need to: (1) register it in the tool registry, and (2) add a match arm in <code>execute_http_tool</code>.</p>
+
+<p><strong>Example: Adding a <code>get_stock_price</code> tool</strong></p>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/server/src/lib.rs</span>
+  <span class="file-desc">Step 1: Register the tool in builtin_http_tools()</span>
+</div>
+<pre class="file-code"><code><span class="kw">fn</span> <span class="fn">builtin_http_tools</span>(ctx: &amp;<span class="ty">ReducerContext</span>) {
+    <span class="cm">// ... existing tools (web_search, http_request, memory_store, memory_recall) ...</span>
+
+    <span class="cm">// Add your custom HTTP tool</span>
+    ctx.db.<span class="fn">tool_registry</span>().<span class="fn">insert</span>(<span class="ty">ToolRegistryEntry</span> {
+        name: <span class="st">"get_stock_price"</span>.into(),
+        description: <span class="st">"Get the current stock price for a given ticker symbol"</span>.into(),
+        parameters_schema_json: <span class="st">r#"{
+            "type": "object",
+            "properties": {
+                "symbol": {
+                    "type": "string",
+                    "description": "Stock ticker symbol, e.g. AAPL, GOOGL"
+                }
+            },
+            "required": ["symbol"]
+        }"#</span>.into(),
+        execution_mode: <span class="st">"http"</span>.into(),  <span class="cm">// executes inside the procedure</span>
+    });
+}</code></pre>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/server/src/lib.rs</span>
+  <span class="file-desc">Step 2: Add execution logic in execute_http_tool()</span>
+</div>
+<pre class="file-code"><code><span class="kw">fn</span> <span class="fn">execute_http_tool</span>(ctx: &amp;<span class="ty">ProcedureContext</span>, name: &amp;<span class="ty">str</span>, args_json: &amp;<span class="ty">str</span>) -&gt; <span class="ty">String</span> {
+    <span class="kw">match</span> name {
+        <span class="cm">// ... existing tools ...</span>
+
+        <span class="st">"get_stock_price"</span> =&gt; {
+            <span class="kw">let</span> args: <span class="ty">serde_json::Value</span> = serde_json::from_str(args_json)
+                .unwrap_or_default();
+            <span class="kw">let</span> symbol = args[<span class="st">"symbol"</span>].as_str().unwrap_or(<span class="st">"AAPL"</span>);
+
+            <span class="cm">// Call a stock price API via ctx.http</span>
+            <span class="kw">let</span> url = <span class="kw">format!</span>(
+                <span class="st">"https://api.example.com/stock/{}?apikey=YOUR_KEY"</span>,
+                symbol
+            );
+            <span class="kw">let</span> resp = ctx.<span class="fn">http</span>(<span class="st">"GET"</span>, &amp;url).<span class="fn">send</span>();
+            <span class="kw">let</span> body = <span class="ty">String</span>::from_utf8_lossy(&amp;resp.body());
+            body.chars().<span class="fn">take</span>(<span class="nu">2000</span>).<span class="fn">collect</span>()
+        }
+
+        _ =&gt; <span class="kw">format!</span>(<span class="st">"Unknown HTTP tool: {}"</span>, name),
+    }
+}</code></pre>
+
+<div class="annotation success">
+  <strong>That's it for HTTP tools.</strong> After republishing the module (<code>spacetime publish zeroclaw</code>), the LLM will see <code>get_stock_price</code> in its available tools and can call it. The tool executes inline with zero worker involvement.
+</div>
+
+<h3>Adding a Custom Local Tool</h3>
+
+<p>Local tools execute on the worker machine. To add one: (1) register it in the worker's <code>local_tools()</code> list, and (2) add a match arm in <code>execute_local_tool</code>.</p>
+
+<p><strong>Example: Adding a <code>db_query</code> tool that runs SQL against a local database</strong></p>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/worker/src/main.rs</span>
+  <span class="file-desc">Step 1: Register in local_tools()</span>
+</div>
+<pre class="file-code"><code><span class="kw">fn</span> <span class="fn">local_tools</span>() -&gt; <span class="ty">Vec</span>&lt;(&amp;<span class="kw">static</span> <span class="ty">str</span>, &amp;<span class="kw">static</span> <span class="ty">str</span>, &amp;<span class="kw">static</span> <span class="ty">str</span>)&gt; {
+    <span class="kw">vec!</span>[
+        <span class="cm">// ... existing tools (shell, file_read, file_write) ...</span>
+
+        (<span class="st">"db_query"</span>,
+         <span class="st">"Execute a read-only SQL query against the local SQLite database"</span>,
+         <span class="st">r#"{"type":"object","properties":{
+             "query":{"type":"string","description":"SQL SELECT query to execute"}
+         },"required":["query"]}"#</span>),
+    ]
+}</code></pre>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/worker/src/main.rs</span>
+  <span class="file-desc">Step 2: Add execution logic</span>
+</div>
+<pre class="file-code"><code><span class="kw">fn</span> <span class="fn">execute_local_tool</span>(tool_name: &amp;<span class="ty">str</span>, params_json: &amp;<span class="ty">str</span>) -&gt; <span class="ty">String</span> {
+    <span class="kw">match</span> tool_name {
+        <span class="cm">// ... existing tools ...</span>
+
+        <span class="st">"db_query"</span> =&gt; {
+            <span class="mc">#[derive(serde::Deserialize)]</span>
+            <span class="kw">struct</span> <span class="ty">Params</span> { query: <span class="ty">String</span> }
+
+            <span class="kw">let</span> params: <span class="ty">Params</span> = serde_json::from_str(params_json)
+                .unwrap_or(<span class="ty">Params</span> { query: <span class="ty">String</span>::new() });
+
+            <span class="cm">// Safety: only allow SELECT statements</span>
+            <span class="kw">if</span> !params.query.trim_start().to_uppercase().starts_with(<span class="st">"SELECT"</span>) {
+                <span class="kw">return</span> <span class="st">"Error: only SELECT queries are allowed"</span>.into();
+            }
+
+            <span class="cm">// Execute against local SQLite (pseudocode)</span>
+            <span class="kw">let</span> db = sqlite::open(<span class="st">"./local.db"</span>).unwrap();
+            <span class="kw">let</span> results = db.<span class="fn">execute</span>(&amp;params.query).unwrap();
+            <span class="kw">format!</span>(<span class="st">"{:?}"</span>, results)
+        }
+
+        _ =&gt; <span class="kw">format!</span>(<span class="st">"Unknown local tool: {}"</span>, tool_name),
+    }
+}</code></pre>
+
+<div class="annotation">
+  <strong>Registration happens at startup.</strong> When the worker starts, it calls <code>register_local_tool()</code> for each tool in the list. This inserts a row into the <code>tool_registry</code> table with <code>execution_mode: "local"</code>. The server then knows to queue requests for this tool instead of executing them inline. You can also register tools at runtime via the <code>register_local_tool</code> reducer.
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
 <h2 id="security">9. Security Policy Enforcement</h2>
 
 <div class="file-header">
@@ -836,6 +965,53 @@ spacetime/
 
 <div class="annotation">
   <strong>Deny-by-default in practice:</strong> When the <code>allowed_tools_json</code> list is non-empty, only listed tools are permitted. The blocked list always wins &mdash; even if a tool appears on both lists, it's denied. This mirrors ZeroClaw's main codebase security philosophy.
+</div>
+
+<h3>Security Policy Configuration Examples</h3>
+
+<p>Here are practical examples of configuring security policies via reducer calls.</p>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">CLI / SpacetimeDB reducer calls</span>
+  <span class="file-desc">Common security configurations</span>
+</div>
+<pre class="file-code"><code><span class="cm">// Example 1: Read-only agent — cannot execute shell commands or write files</span>
+<span class="fn">set_security_policy</span>(
+    agent_id:              <span class="nu">1</span>,
+    autonomy_level:        <span class="st">"semi_auto"</span>,
+    allowed_tools_json:    <span class="st">"[]"</span>,                              <span class="cm">// all tools allowed by default</span>
+    blocked_tools_json:    <span class="st">"[\"shell\", \"file_write\"]"</span>,      <span class="cm">// except these</span>
+    max_tool_iterations:   <span class="nu">5</span>,
+    rate_limit_per_minute: <span class="nu">20</span>,
+)
+
+<span class="cm">// Example 2: Minimal research agent — only web search and memory tools</span>
+<span class="fn">set_security_policy</span>(
+    agent_id:              <span class="nu">2</span>,
+    autonomy_level:        <span class="st">"auto"</span>,
+    allowed_tools_json:    <span class="st">"[\"web_search\", \"memory_store\", \"memory_recall\"]"</span>,
+    blocked_tools_json:    <span class="st">"[]"</span>,
+    max_tool_iterations:   <span class="nu">8</span>,
+    rate_limit_per_minute: <span class="nu">30</span>,
+)
+
+<span class="cm">// Example 3: Public-facing bot — strict limits, no dangerous tools</span>
+<span class="fn">set_security_policy</span>(
+    agent_id:              <span class="nu">3</span>,
+    autonomy_level:        <span class="st">"manual"</span>,
+    allowed_tools_json:    <span class="st">"[\"web_search\", \"http_request\"]"</span>,
+    blocked_tools_json:    <span class="st">"[\"shell\", \"file_read\", \"file_write\"]"</span>,
+    max_tool_iterations:   <span class="nu">3</span>,
+    rate_limit_per_minute: <span class="nu">5</span>,
+)
+
+<span class="cm">// Via CLI:</span>
+<span class="cm">// spacetime call zeroclaw set_security_policy -- 1 "semi_auto" "[]" \</span>
+<span class="cm">//   "[\"shell\", \"file_write\"]" 5 20</span></code></pre>
+
+<div class="annotation success">
+  <strong>Runtime updates:</strong> Security policies can be changed at any time via the <code>set_security_policy</code> reducer. Changes take effect immediately on the next tool call &mdash; no restart or redeployment needed. This is a key advantage of the "security as data" design.
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
