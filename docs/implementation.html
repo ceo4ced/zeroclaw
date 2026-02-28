@@ -671,6 +671,98 @@ spacetime/
 </div>
 
 <!-- ═══════════════════════════════════════════════════════════════════ -->
+<h2 id="continue-convo">7b. continue_conversation() &mdash; Resuming After Local Tools</h2>
+
+<p>When the orchestration loop encounters local tools, it pauses by returning <code>ProcessResult { status: "awaiting_local_tools" }</code>. After the worker executes the tools and submits results, <code>continue_conversation()</code> resumes the loop.</p>
+
+<h3>The Full Local Tool Lifecycle</h3>
+
+<div class="annotation">
+  <strong>End-to-end flow:</strong> <code>process_message()</code> &rarr; orchestration pauses &rarr; worker picks up requests &rarr; <code>submit_local_tool_result()</code> for each &rarr; <code>continue_conversation()</code> &rarr; orchestration resumes &rarr; LLM sees tool results &rarr; final response.
+</div>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/server/src/lib.rs</span>
+  <span class="file-desc">continue_conversation procedure</span>
+</div>
+<pre class="file-code"><code><span class="mc">#[spacetimedb::reducer]</span>  <span class="cm">// procedure (uses ProcedureContext for ctx.http)</span>
+<span class="kw">pub fn</span> <span class="fn">continue_conversation</span>(
+    ctx: &amp;<span class="ty">ProcedureContext</span>,
+    conversation_id: <span class="ty">u64</span>,
+) -&gt; <span class="ty">ProcessResult</span> {
+    <span class="cm">// 1. Look up the conversation</span>
+    <span class="kw">let</span> conversation = <span class="kw">match</span> ctx.db.<span class="fn">conversations</span>().<span class="fn">id</span>().<span class="fn">find</span>(&amp;conversation_id) {
+        <span class="ty">Some</span>(c) =&gt; c,
+        <span class="ty">None</span> =&gt; <span class="kw">return</span> <span class="fn">error_result</span>(<span class="st">"Conversation not found"</span>),
+    };
+
+    <span class="cm">// 2. Check that all pending local tool requests are complete</span>
+    <span class="kw">let</span> pending: <span class="ty">Vec</span>&lt;<span class="ty">LocalToolRequest</span>&gt; = ctx.db.<span class="fn">local_tool_requests</span>().<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|r| r.conversation_id == conversation_id
+            &amp;&amp; (r.status == <span class="st">"pending"</span> || r.status == <span class="st">"processing"</span>))
+        .<span class="fn">collect</span>();
+
+    <span class="kw">if</span> !pending.is_empty() {
+        <span class="kw">return</span> <span class="fn">error_result</span>(<span class="st">"Not all local tool requests are complete"</span>);
+    }
+
+    <span class="cm">// 3. Collect completed tool results and store as messages</span>
+    <span class="kw">let</span> completed: <span class="ty">Vec</span>&lt;<span class="ty">LocalToolRequest</span>&gt; = ctx.db.<span class="fn">local_tool_requests</span>().<span class="fn">iter</span>()
+        .<span class="fn">filter</span>(|r| r.conversation_id == conversation_id
+            &amp;&amp; (r.status == <span class="st">"completed"</span> || r.status == <span class="st">"failed"</span>))
+        .<span class="fn">collect</span>();
+
+    <span class="kw">for</span> req <span class="kw">in</span> &amp;completed {
+        ctx.db.<span class="fn">messages</span>().<span class="fn">insert</span>(<span class="ty">Message</span> {
+            id: <span class="nu">0</span>,
+            conversation_id,
+            role: <span class="st">"tool"</span>.into(),
+            content: req.result.clone(),
+            tool_call_id: req.tool_call_id.clone(),
+            tool_calls_json: <span class="ty">String</span>::new(),
+            created_at: ctx.timestamp,
+        });
+    }
+
+    <span class="cm">// 4. Look up the agent and resume the orchestration loop</span>
+    <span class="kw">let</span> agent = ctx.db.<span class="fn">agents</span>().<span class="fn">id</span>().<span class="fn">find</span>(&amp;conversation.agent_id).unwrap();
+    <span class="fn">orchestration_loop</span>(ctx, &amp;agent, &amp;conversation)
+}</code></pre>
+
+<div class="annotation warn">
+  <strong>All-or-nothing:</strong> <code>continue_conversation()</code> checks that <em>all</em> pending local tool requests for the conversation are completed or failed before resuming. If you call it before all results are submitted, it returns an error. The worker must submit results for every pending request first.
+</div>
+
+<h3>Worker-Side Flow</h3>
+
+<p>Here is what the worker does when it receives pending tool requests:</p>
+
+<div class="file-header">
+  <span class="file-icon">&#x1f4c4;</span>
+  <span class="file-path">spacetime/worker/src/main.rs</span>
+  <span class="file-desc">Tool request handling (conceptual)</span>
+</div>
+<pre class="file-code"><code><span class="cm">// Worker receives subscription update: new LocalToolRequest with status="pending"</span>
+<span class="kw">fn</span> <span class="fn">on_tool_request</span>(req: &amp;<span class="ty">LocalToolRequest</span>) {
+    <span class="cm">// 1. Execute the tool locally</span>
+    <span class="kw">let</span> result = <span class="fn">execute_local_tool</span>(&amp;req.tool_name, &amp;req.parameters_json);
+
+    <span class="cm">// 2. Submit the result back to SpacetimeDB</span>
+    conn.<span class="fn">reducers</span>().<span class="fn">submit_local_tool_result</span>(
+        req.id,
+        result,
+        <span class="kw">true</span>,  <span class="cm">// success</span>
+    );
+
+    <span class="cm">// 3. After ALL requests for this conversation are submitted,</span>
+    <span class="cm">//    call continue_conversation to resume the agent loop</span>
+    <span class="kw">if</span> <span class="fn">all_requests_complete</span>(req.conversation_id) {
+        conn.<span class="fn">procedures</span>().<span class="fn">continue_conversation</span>(req.conversation_id);
+    }
+}</code></pre>
+
+<!-- ═══════════════════════════════════════════════════════════════════ -->
 <h2 id="http-tools">8. HTTP Tool Execution</h2>
 
 <div class="file-header">
