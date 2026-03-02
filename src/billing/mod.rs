@@ -67,7 +67,9 @@ pub mod config;
 pub mod crypto;
 pub mod display;
 pub mod metering;
+pub mod observer;
 pub mod paypal;
+pub mod persistence;
 pub mod spending;
 pub mod stripe;
 pub mod traits;
@@ -80,6 +82,7 @@ pub use config::{BillingConfig, UserTier};
 pub use crypto::CryptoProvider;
 pub use display::{CostDisplay, DisplayUpdate};
 pub use metering::{ChargeResult, PreflightResult, TaskMeter};
+pub use observer::BillingObserver;
 pub use paypal::PaypalProvider;
 pub use spending::{
     format_cents, CircuitBreaker, CircuitState, PrepaymentBalance, SpendingLimit, UsageTracker,

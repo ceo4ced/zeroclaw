@@ -51,6 +51,7 @@ fn parse_temperature(s: &str) -> std::result::Result<f64, String> {
 mod agent;
 mod approval;
 mod auth;
+mod billing;
 mod channels;
 mod rag {
     pub use zeroclaw::rag::*;
@@ -395,9 +396,25 @@ Examples:
         memory_command: MemoryCommands,
     },
 
+    /// Manage billing (balance, top-up, usage)
+    #[command(long_about = "\
+Manage billing and prepaid balance.
+
+View balance, top up, set spending limits, and check usage.
+
+Examples:
+  zeroclaw billing status
+  zeroclaw billing top-up 1000
+  zeroclaw billing set-limit 2000
+  zeroclaw billing usage")]
+    Billing {
+        #[command(subcommand)]
+        billing_command: zeroclaw::BillingCommands,
+    },
+
     /// Manage configuration
     #[command(long_about = "\
-Manage ZeroClaw configuration.
+Manage configuration.
 
 Inspect and export configuration settings. Use 'schema' to dump \
 the full JSON Schema for the config file, which documents every \
@@ -1023,6 +1040,8 @@ async fn main() -> Result<()> {
             peripherals::handle_command(peripheral_command.clone(), &config).await
         }
 
+        Commands::Billing { billing_command } => handle_billing_command(billing_command, &config),
+
         Commands::Config { config_command } => match config_command {
             ConfigCommands::Schema => {
                 let schema = schemars::schema_for!(config::Config);
@@ -1033,6 +1052,81 @@ async fn main() -> Result<()> {
                 Ok(())
             }
         },
+    }
+}
+
+fn handle_billing_command(
+    command: zeroclaw::BillingCommands,
+    config: &config::Config,
+) -> Result<()> {
+    use billing::{format_cents, BillingObserver};
+
+    let user_id = std::env::var("USER").unwrap_or_else(|_| "default_user".into());
+    let observer = BillingObserver::new(&config.billing, &user_id, &config.workspace_dir);
+
+    match command {
+        zeroclaw::BillingCommands::Status => {
+            let summary = observer.account_summary();
+            println!("Billing Status");
+            println!("──────────────────────────────");
+            println!("  User:         {}", summary.user_id);
+            println!("  Tier:         {}", summary.tier);
+            println!("  Balance:      {}", summary.balance_display);
+            println!("  Tasks today:  {}", summary.tasks_today);
+            println!("  Spent today:  {}", summary.spent_today_display);
+            println!("  Daily limit:  {}", summary.daily_limit_display);
+            println!(
+                "  LLM:          {}",
+                if summary.uses_platform_llm {
+                    "platform (Gemma)"
+                } else {
+                    "BYOK (your API key)"
+                }
+            );
+            if !config.billing.enabled {
+                println!();
+                println!("  Billing is currently DISABLED.");
+                println!("  Enable with: billing.enabled = true in config.toml");
+            }
+            Ok(())
+        }
+        zeroclaw::BillingCommands::TopUp { amount_cents } => {
+            if !config.billing.enabled {
+                bail!("Billing is not enabled. Set billing.enabled = true in config.toml");
+            }
+            match observer.top_up(amount_cents) {
+                Ok(result) => {
+                    println!(
+                        "Top-up successful: +{} -> {}",
+                        format_cents(i64::from(amount_cents)),
+                        result.balance_display
+                    );
+                    Ok(())
+                }
+                Err(e) => bail!("{e}"),
+            }
+        }
+        zeroclaw::BillingCommands::SetLimit { limit_cents } => {
+            observer.set_daily_limit(limit_cents);
+            println!(
+                "Daily spending limit set to {}",
+                format_cents(i64::from(limit_cents))
+            );
+            Ok(())
+        }
+        zeroclaw::BillingCommands::Usage => {
+            let summary = observer.account_summary();
+            let remaining =
+                i64::from(summary.daily_limit_cents) - i64::from(summary.spent_today_cents);
+            println!("Usage Summary");
+            println!("──────────────────────────────");
+            println!("  Tasks today:   {}", summary.tasks_today);
+            println!("  Spent today:   {}", summary.spent_today_display);
+            println!("  Daily limit:   {}", summary.daily_limit_display);
+            println!("  Remaining:     {}", format_cents(remaining));
+            println!("  Balance:       {}", summary.balance_display);
+            Ok(())
+        }
     }
 }
 

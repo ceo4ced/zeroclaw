@@ -431,6 +431,43 @@ Examples:
         #[arg(long)]
         host: String,
     },
-    /// Flash ZeroClaw firmware to Nucleo-F401RE (builds + probe-rs run)
+    /// Flash firmware to Nucleo-F401RE (builds + probe-rs run)
     FlashNucleo,
+}
+
+/// Billing management subcommands
+#[derive(Subcommand, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum BillingCommands {
+    /// Show current billing status (balance, tier, daily usage)
+    Status,
+    /// Top up prepaid balance
+    #[command(long_about = "\
+Top up your prepaid balance.
+
+The minimum top-up amount is $10.00. Balance is stored locally \
+and deducted at $0.10 per task.
+
+Examples:
+  zeroclaw billing top-up 1000    # add $10.00 (amount in cents)
+  zeroclaw billing top-up 5000    # add $50.00")]
+    TopUp {
+        /// Amount to add in cents (e.g. 1000 = $10.00)
+        amount_cents: u32,
+    },
+    /// Set daily spending limit
+    #[command(long_about = "\
+Set your daily spending limit.
+
+Tasks will be blocked once the daily limit is reached. \
+The limit resets at midnight UTC.
+
+Examples:
+  zeroclaw billing set-limit 500   # $5.00/day (default)
+  zeroclaw billing set-limit 2000  # $20.00/day")]
+    SetLimit {
+        /// Daily limit in cents (e.g. 500 = $5.00/day)
+        limit_cents: u32,
+    },
+    /// Show session cost summary
+    Usage,
 }

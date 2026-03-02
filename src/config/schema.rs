@@ -175,6 +175,10 @@ pub struct Config {
     #[serde(default)]
     pub cost: CostConfig,
 
+    /// Billing configuration: task pricing, spending limits, balance (`[billing]`).
+    #[serde(default)]
+    pub billing: crate::billing::BillingConfig,
+
     /// Peripheral board configuration for hardware integration (`[peripherals]`).
     #[serde(default)]
     pub peripherals: PeripheralsConfig,
@@ -2835,6 +2839,7 @@ impl Default for Config {
             proxy: ProxyConfig::default(),
             identity: IdentityConfig::default(),
             cost: CostConfig::default(),
+            billing: crate::billing::BillingConfig::default(),
             peripherals: PeripheralsConfig::default(),
             agents: HashMap::new(),
             hardware: HardwareConfig::default(),
@@ -3987,6 +3992,7 @@ default_temperature = 0.7
             agent: AgentConfig::default(),
             identity: IdentityConfig::default(),
             cost: CostConfig::default(),
+            billing: crate::billing::BillingConfig::default(),
             peripherals: PeripheralsConfig::default(),
             agents: HashMap::new(),
             hardware: HardwareConfig::default(),
@@ -4156,6 +4162,7 @@ tool_dispatcher = "xml"
             agent: AgentConfig::default(),
             identity: IdentityConfig::default(),
             cost: CostConfig::default(),
+            billing: crate::billing::BillingConfig::default(),
             peripherals: PeripheralsConfig::default(),
             agents: HashMap::new(),
             hardware: HardwareConfig::default(),

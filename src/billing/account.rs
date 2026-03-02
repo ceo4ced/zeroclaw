@@ -90,6 +90,11 @@ impl UserAccount {
         self.meter.charge_task(&mut self.balance, &mut self.tracker)
     }
 
+    /// Restore balance from persisted state (e.g. on startup).
+    pub fn restore_balance(&mut self, balance_cents: i64) {
+        self.balance.balance_cents = balance_cents;
+    }
+
     /// Current balance in cents.
     pub fn balance_cents(&self) -> i64 {
         self.balance.balance()
@@ -143,18 +148,18 @@ impl UserAccount {
 
     /// Get a summary of the account state for display.
     pub fn summary(&self) -> AccountSummary {
+        let spent = self.tracker.daily_spend_cents(&self.user_id);
+        let limit = self.limit.max_amount_cents;
         AccountSummary {
             user_id: self.user_id.clone(),
             tier: self.tier,
             balance_display: self.balance.balance_display(),
             balance_cents: self.balance.balance(),
             tasks_today: self.tracker.daily_task_count(&self.user_id),
-            spent_today_display: super::spending::format_cents(i64::from(
-                self.tracker.daily_spend_cents(&self.user_id),
-            )),
-            daily_limit_display: super::spending::format_cents(i64::from(
-                self.limit.max_amount_cents,
-            )),
+            spent_today_cents: spent,
+            spent_today_display: super::spending::format_cents(i64::from(spent)),
+            daily_limit_cents: limit,
+            daily_limit_display: super::spending::format_cents(i64::from(limit)),
             uses_platform_llm: self.uses_platform_llm(),
         }
     }
@@ -175,7 +180,9 @@ pub struct AccountSummary {
     pub balance_display: String,
     pub balance_cents: i64,
     pub tasks_today: u32,
+    pub spent_today_cents: u32,
     pub spent_today_display: String,
+    pub daily_limit_cents: u32,
     pub daily_limit_display: String,
     pub uses_platform_llm: bool,
 }

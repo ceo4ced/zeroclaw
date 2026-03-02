@@ -14,14 +14,14 @@
 //! - Up to $2 negative overdraft allowed (temporary policy).
 //! - Real-time cost display with batched updates.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Top-level billing configuration.
 ///
-/// TODO: Wire into `Config` in `src/config/schema.rs` once billing
-/// integration is ready. All fields have safe defaults so existing
-/// configs without a `[billing]` section will keep working.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// All fields have safe defaults so existing configs without a
+/// `[billing]` section will keep working.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BillingConfig {
     /// Whether billing is enabled. Default: `false`.
     #[serde(default)]
@@ -75,7 +75,7 @@ fn default_currency() -> String {
 /// User billing tier.
 ///
 /// Determines LLM access model and pricing behavior.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum UserTier {
     /// Default tier: uses platform-hosted Gemma, flat $0.10/task rate.
@@ -99,7 +99,7 @@ impl std::fmt::Display for UserTier {
 /// Task pricing configuration.
 ///
 /// MVP uses a flat per-task rate regardless of complexity.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PricingConfig {
     /// Cost per task in cents. Default: 10 ($0.10).
     #[serde(default = "default_task_cost_cents")]
@@ -121,7 +121,7 @@ fn default_task_cost_cents() -> u32 {
 // ── Spending limits ─────────────────────────────────────────────
 
 /// Spending limit and budget enforcement configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct SpendingConfig {
     /// Daily spending limit in cents. Default: 500 ($5.00).
     #[serde(default = "default_daily_limit_cents")]
@@ -161,7 +161,7 @@ fn default_true() -> bool {
 // ── Balance ─────────────────────────────────────────────────────
 
 /// Balance and top-up configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct BalanceConfig {
     /// Minimum top-up amount in cents. Default: 1000 ($10.00).
     #[serde(default = "default_min_topup_cents")]
@@ -212,7 +212,7 @@ fn default_warning_thresholds_cents() -> Vec<u32> {
 ///
 /// Each field is optional; only configured providers will be available
 /// at runtime. These are used for top-up payment processing.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 pub struct BillingProvidersConfig {
     #[serde(default)]
     pub stripe: Option<StripeConfig>,
@@ -229,14 +229,14 @@ pub struct BillingProvidersConfig {
 }
 
 /// Stripe provider configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct StripeConfig {
     pub api_key: Option<String>,
     pub webhook_secret: Option<String>,
 }
 
 /// PayPal provider configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct PaypalConfig {
     pub client_id: Option<String>,
     pub client_secret: Option<String>,
@@ -245,7 +245,7 @@ pub struct PaypalConfig {
 }
 
 /// Crypto payment configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CryptoConfig {
     pub rpc_url: Option<String>,
     #[serde(default = "default_confirmations")]
@@ -257,13 +257,13 @@ fn default_confirmations() -> u32 {
 }
 
 /// Amex provider configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct AmexConfig {
     pub merchant_id: Option<String>,
 }
 
 /// Venmo provider configuration (via Braintree).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct VenmoConfig {
     pub merchant_id: Option<String>,
     pub public_key: Option<String>,
@@ -271,7 +271,7 @@ pub struct VenmoConfig {
 }
 
 /// Cash App provider configuration (via Square).
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct CashAppConfig {
     pub access_token: Option<String>,
     pub location_id: Option<String>,
