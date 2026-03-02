@@ -1,22 +1,25 @@
-//! Billing configuration schema placeholder.
+//! Billing configuration schema for MVP.
 //!
-//! Defines the [`BillingConfig`] struct that will eventually be added to the
-//! main [`Config`](crate::config::Config) under a `[billing]` section.
+//! Defines the [`BillingConfig`] struct and related types for the flat-rate
+//! task billing model. All amounts are stored in cents (USD minor units).
 //!
-//! # Status
+//! # MVP Billing Model
 //!
-//! This is **placeholder scaffolding**. The struct is not yet wired into the
-//! main config schema. When the billing strategy is finalized:
-//! 1. Add `pub billing: BillingConfig` to `Config` in `src/config/schema.rs`.
-//! 2. Ensure serde defaults work for backward compatibility.
-//! 3. Update `docs/config-reference.md` with the new keys.
+//! - Flat $0.10 per task for all users on the default tier.
+//! - Self-hosted Gemma as the default LLM (no per-token API cost to user).
+//! - Paid tier unlocks BYOK (bring your own API key) — no LLM markup.
+//! - Prepaid balance with $10 minimum top-up, no refunds.
+//! - $5/day default spending limit (soft cap).
+//! - Low balance warnings at $2 and $1.
+//! - Up to $2 negative overdraft allowed (temporary policy).
+//! - Real-time cost display with batched updates.
 
 use serde::{Deserialize, Serialize};
 
 /// Top-level billing configuration.
 ///
 /// TODO: Wire into `Config` in `src/config/schema.rs` once billing
-/// strategy is finalized. All fields have safe defaults so existing
+/// integration is ready. All fields have safe defaults so existing
 /// configs without a `[billing]` section will keep working.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BillingConfig {
@@ -24,8 +27,7 @@ pub struct BillingConfig {
     #[serde(default)]
     pub enabled: bool,
 
-    /// Default payment provider key (e.g. `"stripe"`, `"paypal"`).
-    /// Must match a key registered in the payment provider factory.
+    /// Default payment provider key for top-ups (e.g. `"stripe"`, `"paypal"`).
     #[serde(default)]
     pub default_provider: Option<String>,
 
@@ -33,13 +35,21 @@ pub struct BillingConfig {
     #[serde(default = "default_currency")]
     pub default_currency: String,
 
-    /// Per-provider configuration sections.
+    /// Per-provider configuration sections (for top-up payment processing).
     #[serde(default)]
     pub providers: BillingProvidersConfig,
+
+    /// Task pricing configuration.
+    #[serde(default)]
+    pub pricing: PricingConfig,
 
     /// Spending limits and controls.
     #[serde(default)]
     pub spending: SpendingConfig,
+
+    /// Balance and top-up configuration.
+    #[serde(default)]
+    pub balance: BalanceConfig,
 }
 
 impl Default for BillingConfig {
@@ -49,7 +59,9 @@ impl Default for BillingConfig {
             default_provider: None,
             default_currency: default_currency(),
             providers: BillingProvidersConfig::default(),
+            pricing: PricingConfig::default(),
             spending: SpendingConfig::default(),
+            balance: BalanceConfig::default(),
         }
     }
 }
@@ -58,126 +70,64 @@ fn default_currency() -> String {
     "USD".to_string()
 }
 
-/// Per-provider credential and endpoint configuration.
+// ── User tier ───────────────────────────────────────────────────
+
+/// User billing tier.
 ///
-/// Each field is optional; only configured providers will be available
-/// at runtime.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct BillingProvidersConfig {
-    /// Stripe-specific configuration.
-    #[serde(default)]
-    pub stripe: Option<StripeConfig>,
-
-    /// PayPal-specific configuration.
-    #[serde(default)]
-    pub paypal: Option<PaypalConfig>,
-
-    /// Crypto payment configuration.
-    #[serde(default)]
-    pub crypto: Option<CryptoConfig>,
-
-    /// Amex-specific configuration.
-    #[serde(default)]
-    pub amex: Option<AmexConfig>,
-
-    /// Venmo-specific configuration (via Braintree).
-    #[serde(default)]
-    pub venmo: Option<VenmoConfig>,
-
-    /// Cash App-specific configuration (via Square).
-    #[serde(default)]
-    pub cashapp: Option<CashAppConfig>,
+/// Determines LLM access model and pricing behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum UserTier {
+    /// Default tier: uses platform-hosted Gemma, flat $0.10/task rate.
+    Default,
+    /// Paid tier: can bring own API key (BYOK), skips LLM markup,
+    /// still pays platform fees per task.
+    Paid,
 }
 
-/// Stripe provider configuration.
+impl std::fmt::Display for UserTier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Default => write!(f, "default"),
+            Self::Paid => write!(f, "paid"),
+        }
+    }
+}
+
+// ── Pricing ─────────────────────────────────────────────────────
+
+/// Task pricing configuration.
 ///
-/// TODO: Finalize required fields once Stripe integration is designed.
+/// MVP uses a flat per-task rate regardless of complexity.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StripeConfig {
-    /// Stripe secret key. Should be injected via env var or secrets store.
-    /// TODO: Use the ZeroClaw secrets infrastructure instead of raw strings.
-    pub api_key: Option<String>,
-    /// Webhook signing secret for verifying Stripe events.
-    pub webhook_secret: Option<String>,
+pub struct PricingConfig {
+    /// Cost per task in cents. Default: 10 ($0.10).
+    #[serde(default = "default_task_cost_cents")]
+    pub task_cost_cents: u32,
 }
 
-/// PayPal provider configuration.
-///
-/// TODO: Finalize required fields once PayPal integration is designed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PaypalConfig {
-    /// PayPal OAuth client ID.
-    pub client_id: Option<String>,
-    /// PayPal OAuth client secret.
-    pub client_secret: Option<String>,
-    /// Use sandbox environment. Default: `true`.
-    #[serde(default = "default_true")]
-    pub sandbox: bool,
+impl Default for PricingConfig {
+    fn default() -> Self {
+        Self {
+            task_cost_cents: default_task_cost_cents(),
+        }
+    }
 }
 
-/// Crypto payment configuration.
-///
-/// TODO: Finalize required fields once crypto integration is designed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CryptoConfig {
-    /// JSON-RPC endpoint for the target chain.
-    pub rpc_url: Option<String>,
-    /// Number of confirmations required before marking payment as succeeded.
-    #[serde(default = "default_confirmations")]
-    pub confirmations_required: u32,
+fn default_task_cost_cents() -> u32 {
+    10
 }
 
-/// Amex provider configuration.
-///
-/// TODO: Finalize required fields once Amex integration is designed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AmexConfig {
-    /// Amex merchant identifier.
-    pub merchant_id: Option<String>,
-}
-
-/// Venmo provider configuration (via Braintree).
-///
-/// TODO: Finalize required fields once Venmo integration is designed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VenmoConfig {
-    /// Braintree merchant ID.
-    pub merchant_id: Option<String>,
-    /// Braintree public key.
-    pub public_key: Option<String>,
-    /// Braintree private key.
-    pub private_key: Option<String>,
-}
-
-/// Cash App provider configuration (via Square).
-///
-/// TODO: Finalize required fields once Cash App integration is designed.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CashAppConfig {
-    /// Square access token.
-    pub access_token: Option<String>,
-    /// Square location ID.
-    pub location_id: Option<String>,
-}
+// ── Spending limits ─────────────────────────────────────────────
 
 /// Spending limit and budget enforcement configuration.
-///
-/// TODO: Wire into spending controls module once strategy is finalized.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpendingConfig {
-    /// Per-transaction maximum in minor units of default currency.
-    #[serde(default)]
-    pub max_transaction_amount_minor: Option<u64>,
+    /// Daily spending limit in cents. Default: 500 ($5.00).
+    #[serde(default = "default_daily_limit_cents")]
+    pub daily_limit_cents: u32,
 
-    /// Daily spending limit in minor units of default currency.
-    #[serde(default)]
-    pub daily_limit_minor: Option<u64>,
-
-    /// Monthly spending limit in minor units of default currency.
-    #[serde(default)]
-    pub monthly_limit_minor: Option<u64>,
-
-    /// Whether the circuit breaker auto-halts on repeated failures.
+    /// Whether the circuit breaker auto-halts on repeated payment failures.
     #[serde(default = "default_true")]
     pub circuit_breaker_enabled: bool,
 
@@ -189,25 +139,142 @@ pub struct SpendingConfig {
 impl Default for SpendingConfig {
     fn default() -> Self {
         Self {
-            max_transaction_amount_minor: None,
-            daily_limit_minor: None,
-            monthly_limit_minor: None,
+            daily_limit_cents: default_daily_limit_cents(),
             circuit_breaker_enabled: true,
             circuit_breaker_threshold: default_circuit_breaker_threshold(),
         }
     }
 }
 
+fn default_daily_limit_cents() -> u32 {
+    500
+}
+
+fn default_circuit_breaker_threshold() -> u32 {
+    5
+}
+
 fn default_true() -> bool {
     true
+}
+
+// ── Balance ─────────────────────────────────────────────────────
+
+/// Balance and top-up configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BalanceConfig {
+    /// Minimum top-up amount in cents. Default: 1000 ($10.00).
+    #[serde(default = "default_min_topup_cents")]
+    pub min_topup_cents: u32,
+
+    /// Maximum allowed overdraft in cents. Default: 200 ($2.00).
+    /// When balance goes this far negative, new tasks are blocked.
+    #[serde(default = "default_max_overdraft_cents")]
+    pub max_overdraft_cents: u32,
+
+    /// Balance thresholds (in cents) at which low-balance warnings fire.
+    /// Default: [200, 100] ($2.00 and $1.00).
+    /// Evaluated in order — first match triggers the corresponding alert level.
+    #[serde(default = "default_warning_thresholds_cents")]
+    pub warning_thresholds_cents: Vec<u32>,
+
+    /// Whether refunds are allowed. Default: `false` (no refunds in MVP).
+    #[serde(default)]
+    pub refunds_enabled: bool,
+}
+
+impl Default for BalanceConfig {
+    fn default() -> Self {
+        Self {
+            min_topup_cents: default_min_topup_cents(),
+            max_overdraft_cents: default_max_overdraft_cents(),
+            warning_thresholds_cents: default_warning_thresholds_cents(),
+            refunds_enabled: false,
+        }
+    }
+}
+
+fn default_min_topup_cents() -> u32 {
+    1000
+}
+
+fn default_max_overdraft_cents() -> u32 {
+    200
+}
+
+fn default_warning_thresholds_cents() -> Vec<u32> {
+    vec![200, 100]
+}
+
+// ── Payment provider configs ────────────────────────────────────
+
+/// Per-provider credential and endpoint configuration.
+///
+/// Each field is optional; only configured providers will be available
+/// at runtime. These are used for top-up payment processing.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct BillingProvidersConfig {
+    #[serde(default)]
+    pub stripe: Option<StripeConfig>,
+    #[serde(default)]
+    pub paypal: Option<PaypalConfig>,
+    #[serde(default)]
+    pub crypto: Option<CryptoConfig>,
+    #[serde(default)]
+    pub amex: Option<AmexConfig>,
+    #[serde(default)]
+    pub venmo: Option<VenmoConfig>,
+    #[serde(default)]
+    pub cashapp: Option<CashAppConfig>,
+}
+
+/// Stripe provider configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StripeConfig {
+    pub api_key: Option<String>,
+    pub webhook_secret: Option<String>,
+}
+
+/// PayPal provider configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PaypalConfig {
+    pub client_id: Option<String>,
+    pub client_secret: Option<String>,
+    #[serde(default = "default_true")]
+    pub sandbox: bool,
+}
+
+/// Crypto payment configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CryptoConfig {
+    pub rpc_url: Option<String>,
+    #[serde(default = "default_confirmations")]
+    pub confirmations_required: u32,
 }
 
 fn default_confirmations() -> u32 {
     6
 }
 
-fn default_circuit_breaker_threshold() -> u32 {
-    5
+/// Amex provider configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AmexConfig {
+    pub merchant_id: Option<String>,
+}
+
+/// Venmo provider configuration (via Braintree).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VenmoConfig {
+    pub merchant_id: Option<String>,
+    pub public_key: Option<String>,
+    pub private_key: Option<String>,
+}
+
+/// Cash App provider configuration (via Square).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CashAppConfig {
+    pub access_token: Option<String>,
+    pub location_id: Option<String>,
 }
 
 #[cfg(test)]
@@ -223,29 +290,65 @@ mod tests {
     }
 
     #[test]
+    fn pricing_defaults_to_ten_cents() {
+        let config = PricingConfig::default();
+        assert_eq!(config.task_cost_cents, 10);
+    }
+
+    #[test]
+    fn spending_defaults_to_five_dollars_daily() {
+        let config = SpendingConfig::default();
+        assert_eq!(config.daily_limit_cents, 500);
+    }
+
+    #[test]
+    fn balance_defaults_match_mvp_spec() {
+        let config = BalanceConfig::default();
+        assert_eq!(config.min_topup_cents, 1000);
+        assert_eq!(config.max_overdraft_cents, 200);
+        assert_eq!(config.warning_thresholds_cents, vec![200, 100]);
+        assert!(!config.refunds_enabled);
+    }
+
+    #[test]
+    fn user_tier_serde_roundtrip() {
+        let tier = UserTier::Default;
+        let json = serde_json::to_string(&tier).unwrap();
+        assert_eq!(json, "\"default\"");
+        let parsed: UserTier = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, UserTier::Default);
+
+        let paid = UserTier::Paid;
+        let json = serde_json::to_string(&paid).unwrap();
+        assert_eq!(json, "\"paid\"");
+        let parsed: UserTier = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, UserTier::Paid);
+    }
+
+    #[test]
+    fn user_tier_display() {
+        assert_eq!(UserTier::Default.to_string(), "default");
+        assert_eq!(UserTier::Paid.to_string(), "paid");
+    }
+
+    #[test]
     fn billing_config_serde_roundtrip() {
         let config = BillingConfig {
             enabled: true,
             default_provider: Some("stripe".into()),
             default_currency: "EUR".into(),
             providers: BillingProvidersConfig::default(),
+            pricing: PricingConfig {
+                task_cost_cents: 15,
+            },
             spending: SpendingConfig::default(),
+            balance: BalanceConfig::default(),
         };
         let json = serde_json::to_string(&config).unwrap();
         let parsed: BillingConfig = serde_json::from_str(&json).unwrap();
         assert!(parsed.enabled);
         assert_eq!(parsed.default_provider.as_deref(), Some("stripe"));
-        assert_eq!(parsed.default_currency, "EUR");
-    }
-
-    #[test]
-    fn spending_config_defaults_are_safe() {
-        let config = SpendingConfig::default();
-        assert!(config.max_transaction_amount_minor.is_none());
-        assert!(config.daily_limit_minor.is_none());
-        assert!(config.monthly_limit_minor.is_none());
-        assert!(config.circuit_breaker_enabled);
-        assert_eq!(config.circuit_breaker_threshold, 5);
+        assert_eq!(parsed.pricing.task_cost_cents, 15);
     }
 
     #[test]
@@ -253,5 +356,8 @@ mod tests {
         let config: BillingConfig = serde_json::from_str("{}").unwrap();
         assert!(!config.enabled);
         assert_eq!(config.default_currency, "USD");
+        assert_eq!(config.pricing.task_cost_cents, 10);
+        assert_eq!(config.spending.daily_limit_cents, 500);
+        assert_eq!(config.balance.min_topup_cents, 1000);
     }
 }
